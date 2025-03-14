@@ -14,14 +14,90 @@ from html import unescape
 import unicodedata
 
 def clean_title(title):
-    """Convert spaces and pipes to underscores and clean up multiple underscores"""
-    # Replace spaces and pipes with underscores
-    title = re.sub(r'[\s|]+', '_', title)
+    """Convert spaces and pipes to underscores while preserving Japanese characters"""
+    # Log the original title
+    #print(f"Original title: {title}")
     
-    # Remove multiple consecutive underscores
-    title = re.sub(r'_+', '_', title)
+    # First identify all Japanese character segments to preserve them
+    jp_chars_pattern = (
+        r'[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff'
+        r'\uf900-\ufaff\uff00-\uffef]|'
+        r'【|】|「|」|『|』'
+    )
     
-    return title.strip('_')  # Remove leading/trailing underscores
+    # Extract Japanese segments with positions
+    jp_segments = []
+    for match in re.finditer(f'({jp_chars_pattern}+)', title):
+        jp_segments.append((match.start(), match.end(), match.group(0)))
+    
+    #print(f"Found Japanese segments: {[seg for _, _, seg in jp_segments]}")
+    
+    # Define emoji pattern - excluding the Japanese character ranges
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002702-\U000027B0"  # Dingbats
+        u"\U000024C2-\U0001F251"  # Enclosed characters
+        u"\U00002728"            # Sparkles ✨
+        "]+", flags=re.UNICODE)
+    
+    # Remove emojis, but skip Japanese segments
+    result = ""
+    last_pos = 0
+    
+    # Process the title, skipping over the Japanese segments when removing emojis
+    for start, end, segment in jp_segments:
+        # Process the part before this Japanese segment
+        before_part = title[last_pos:start]
+        before_part = emoji_pattern.sub('', before_part)
+        result += before_part
+        
+        # Add the Japanese segment as is
+        result += segment
+        last_pos = end
+    
+    # Process the remaining part after the last Japanese segment
+    if last_pos < len(title):
+        last_part = title[last_pos:]
+        last_part = emoji_pattern.sub('', last_part)
+        result += last_part
+    
+    #print(f"After selective emoji removal: {result}")
+    
+    # Now process non-Japanese parts to replace spaces and pipes
+    # We'll keep track of segments again
+    final_result = ""
+    last_pos = 0
+    
+    # Extract Japanese segments from the emoji-removed result
+    jp_segments_final = []
+    for match in re.finditer(f'({jp_chars_pattern}+)', result):
+        jp_segments_final.append((match.start(), match.end(), match.group(0)))
+    
+    # Process the result, converting spaces to underscores only in non-Japanese segments
+    for start, end, segment in jp_segments_final:
+        # Process the part before this Japanese segment
+        before_part = result[last_pos:start]
+        before_part = re.sub(r'[\s|]+', '_', before_part.strip())
+        final_result += before_part
+        
+        # Add the Japanese segment as is
+        final_result += segment
+        last_pos = end
+    
+    # Process the remaining part after the last Japanese segment
+    if last_pos < len(result):
+        last_part = result[last_pos:]
+        last_part = re.sub(r'[\s|]+', '_', last_part.strip())
+        final_result += last_part
+    
+    # Clean up multiple underscores
+    final_result = re.sub(r'_+', '_', final_result)
+    #print(f"Final title: {final_result}")
+    
+    return final_result.rstrip('_')
 
 def validate_channel_id(channel_id):
     """Validate that the channel ID is in the correct format."""
