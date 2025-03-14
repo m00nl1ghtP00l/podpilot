@@ -1,35 +1,3 @@
-def clean_title(title):
-    """Remove emojis and other special characters from title."""
-    if not title:
-        return ""
-    
-    # Pattern to match emoji and other pictographic characters
-    emoji_pattern = re.compile(
-        "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F700-\U0001F77F"  # alchemical symbols
-        "\U0001F780-\U0001F7FF"  # Geometric Shapes
-        "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
-        "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-        "\U0001FA00-\U0001FA6F"  # Chess Symbols
-        "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
-        "\U00002702-\U000027B0"  # Dingbats
-        "\U000024C2-\U0001F251" 
-        "]+", flags=re.UNICODE
-    )
-    
-    # Remove emojis
-    title = emoji_pattern.sub('', title)
-    
-    # Remove other special characters and normalize
-    title = unicodedata.normalize('NFKC', title)
-    
-    # Clean up any double spaces created by removing characters
-    title = re.sub(r'\s+', ' ', title).strip()
-    
-    return title#!/usr/bin/env python3
 """
 YouTube RSS Feed Parser
 Extracts video information from a YouTube channel's RSS feed with improved readability
@@ -45,6 +13,15 @@ import re
 from html import unescape
 import unicodedata
 
+def clean_title(title):
+    """Convert spaces and pipes to underscores and clean up multiple underscores"""
+    # Replace spaces and pipes with underscores
+    title = re.sub(r'[\s|]+', '_', title)
+    
+    # Remove multiple consecutive underscores
+    title = re.sub(r'_+', '_', title)
+    
+    return title.strip('_')  # Remove leading/trailing underscores
 
 def validate_channel_id(channel_id):
     """Validate that the channel ID is in the correct format."""
@@ -140,15 +117,20 @@ def parse_rss_feed(xml_content, from_date=None, to_date=None, include_author=Fal
             if to_date and published_date > to_date:
                 continue
                 
-            video_id = entry.find('./yt:videoId', namespaces).text if entry.find('./yt:videoId', namespaces) is not None else None
+            # Get title and create clean filename
+            raw_title = entry.find('./atom:title', namespaces).text
+            clean_title_str = clean_title(raw_title)
             
-            # Get title and decode HTML entities
-            title = entry.find('./atom:title', namespaces).text
-            title = unescape(title) if title else ""
+            # Create filename with date prefix
+            date_str = published_date.strftime('%Y-%m-%d')
+            clean_filename = f"{date_str}_{clean_title_str}"
+            
+            video_id = entry.find('./yt:videoId', namespaces).text if entry.find('./yt:videoId', namespaces) is not None else None
             
             # Create video entry with basic information
             video = {
-                'title': title,
+                'title': raw_title,  # Original title for display
+                'clean_filename': clean_filename,  # Clean filename for file operations
                 'link': entry.find('./atom:link', namespaces).get('href'),
                 'id': video_id,
                 'published': format_date(published_text),
