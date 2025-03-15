@@ -10,6 +10,7 @@ import re
 import subprocess
 from mp3_transcoder import transcode
 import unicodedata
+import yt_dlp  # Added yt-dlp for reliable audio extraction
 
 # Import functions from find_podcasts.py
 from find_podcasts import clean_title
@@ -110,8 +111,18 @@ def download_file(url, output_path, simulate=False):
         return True
     
     try:
+        # Check if the URL is a YouTube video URL
+        if 'youtube.com' in url or 'youtu.be' in url:
+            print(f"Detected YouTube URL: {url}")
+            return download_audio_from_youtube(url, output_path)
+        
+        # For direct file downloads
         response = requests.get(url, stream=True)
         response.raise_for_status()
+        
+        content_type = response.headers.get('content-type', '')
+        if not content_type.startswith('audio/'):
+            print(f"Warning: Content-Type is {content_type}, not audio. This may not be an audio file.")
         
         total_size = int(response.headers.get('content-length', 0))
         
@@ -125,6 +136,16 @@ def download_file(url, output_path, simulate=False):
         # Check file size after download
         file_size = os.path.getsize(output_path) / (1024 * 1024)  # Convert to MB
         print(f"\nFile size: {file_size:.2f}MB")
+        
+        # Verify it's a valid audio file
+        if not is_valid_audio_file(output_path):
+            print(f"Warning: The downloaded file does not appear to be a valid audio file.")
+            
+            # If the file is too small, it might be an error page
+            if file_size < 0.1:  # Less than 100KB
+                print(f"File is very small ({file_size:.2f}MB), likely not a valid audio file.")
+                os.remove(output_path)
+                return False
         
         # Use mp3_transcoder if file is too large
         if file_size > 25:
@@ -146,6 +167,69 @@ def download_file(url, output_path, simulate=False):
             os.remove(output_path)
         return False
 
+def download_audio_from_youtube(url, output_path):
+    """Download audio from YouTube using yt-dlp"""
+    print(f"Extracting audio from YouTube video: {url}")
+    
+    # Define options for yt-dlp
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': output_path.replace('.mp3', ''),  # Remove .mp3 extension as yt-dlp will add its own
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'progress_hooks': [lambda d: print(f"Download progress: {d['status']}", end='\r') 
+                          if d['status'] != 'finished' else print("\nDownload complete, post-processing...")],
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        
+        # Check if the file was created with the correct extension
+        expected_path = output_path.replace('.mp3', '') + '.mp3'
+        if os.path.exists(expected_path) and expected_path != output_path:
+            os.rename(expected_path, output_path)
+            
+        # Process file size and potentially transcode
+        file_size = os.path.getsize(output_path) / (1024 * 1024)  # Convert to MB
+        print(f"File size: {file_size:.2f}MB")
+        
+        if file_size > 25:
+            print("File is over 25MB limit, transcoding...")
+            result = transcode(output_path, target_size_mb=25, show_progress=True)
+            if result['success']:
+                print(f"Successfully transcoded: {result['original_size_mb']:.2f}MB -> {result['new_size_mb']:.2f}MB")
+                print(f"Final bitrate: {result['bitrate']}kbps")
+            else:
+                print(f"Transcoding failed: {result['error']}")
+                print("Keeping original file")
+        
+        return True
+    except Exception as e:
+        print(f"Error downloading audio from YouTube: {e}")
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        return False
+
+def is_valid_audio_file(file_path):
+    """Check if the file is a valid audio file using ffprobe"""
+    try:
+        # Use ffprobe to get file information
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'a', '-show_entries', 
+             'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+            capture_output=True, text=True
+        )
+        
+        # If ffprobe returns an audio codec, the file should be valid
+        return bool(result.stdout.strip())
+    except Exception as e:
+        print(f"Error checking audio file validity: {e}")
+        return True  # Assume it's valid if we can't check
+
 def download_mode(json_data, output_dir, args):
     """Download new files from JSON data"""
     os.makedirs(output_dir, exist_ok=True)
@@ -166,15 +250,24 @@ def download_mode(json_data, output_dir, args):
         
         # Extract necessary information
         title = video.get('title', '')
-        url = video.get('url', '')
         
-        # Check if URL is missing
+        # Check for URL in various potential fields
+        url = None
+        for url_field in ['url', 'link', 'id']:
+            if url_field in video and video[url_field]:
+                url_value = video[url_field]
+                
+                # Handle YouTube video IDs
+                if url_field == 'id' and len(url_value) == 11 and not url_value.startswith('http'):
+                    url = f"https://www.youtube.com/watch?v={url_value}"
+                else:
+                    url = url_value
+                
+                break
+        
         if not url:
-            # Try using 'link' instead (from find_podcasts output)
-            url = video.get('link', '')
-            if not url:
-                print(f"Warning: No URL found for video {title}")
-                continue
+            print(f"Warning: No URL found for video {title}")
+            continue
         
         # Parse the date
         try:
