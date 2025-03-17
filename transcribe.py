@@ -88,10 +88,31 @@ def transcribe_audio(file_path, client):
         print(f"Error transcribing {file_path}: {e}")
         return False
 
+def load_metadata(metadata_file):
+    """Load metadata from JSON file and extract valid filenames"""
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        if 'videos' not in data:
+            print(f"Error: Invalid metadata format. 'videos' key not found in {metadata_file}")
+            return set()
+            
+        valid_filenames = set()
+        for video in data['videos']:
+            # Check for clean_filename field, which is used in download_audio.py
+            if 'clean_filename' in video:
+                valid_filenames.add(f"{video['clean_filename']}.mp3")
+                
+        return valid_filenames
+    except Exception as e:
+        print(f"Error loading metadata file {metadata_file}: {e}")
+        return set()
+
 def main():
     parser = argparse.ArgumentParser(description='Transcribe Japanese audio files using OpenAI Whisper API')
     parser.add_argument('audio_dir', help='Directory containing audio files')
-    parser.add_argument('metadata_file', help='JSON file containing video metadata (not used)')
+    parser.add_argument('metadata_file', help='JSON file containing video metadata')
     parser.add_argument('--api-key', help='OpenAI API key (or set OPENAI_API_KEY env variable)')
     parser.add_argument('--from-date', type=parse_date_arg, help='Start date (YYYY-MM-DD)')
     parser.add_argument('--to-date', type=parse_date_arg, help='End date (YYYY-MM-DD)')
@@ -113,11 +134,38 @@ def main():
         print(f"Error: Directory not found: {args.audio_dir}")
         exit(1)
     
-    # Get list of MP3 files
-    mp3_files = list(audio_path.glob('*.mp3'))
-    if not mp3_files:
-        print(f"No MP3 files found in {args.audio_dir}")
+    # Load metadata to get valid filenames
+    valid_filenames = load_metadata(args.metadata_file)
+    if not valid_filenames:
+        print(f"No valid filenames found in metadata file: {args.metadata_file}")
         exit(1)
+    
+    print(f"Found {len(valid_filenames)} valid files in metadata")
+    
+    # Get list of MP3 files that match the metadata
+    mp3_files = []
+    for filename in valid_filenames:
+        file_path = audio_path / filename
+        if file_path.exists():
+            mp3_files.append(file_path)
+    
+    if not mp3_files:
+        print(f"No matching MP3 files found in {args.audio_dir}")
+        exit(1)
+    
+    # Report files in metadata but not found in directory
+    missing_files = []
+    for filename in valid_filenames:
+        file_path = audio_path / filename
+        if not file_path.exists():
+            missing_files.append(filename)
+    
+    if missing_files:
+        print(f"\nWARNING: {len(missing_files)} files listed in metadata were not found in the audio directory:")
+        for missing in missing_files[:10]:  # Show first 10 to avoid clutter
+            print(f"  {missing}")
+        if len(missing_files) > 10:
+            print(f"  ... and {len(missing_files) - 10} more")
     
     # Filter files by date and transcription status
     files_to_process = []
@@ -166,7 +214,7 @@ def main():
     
     if not files_to_process:
         print("\nNo files to process")
-        exit(1)
+        exit(0)
     
     # Process files
     success = 0
