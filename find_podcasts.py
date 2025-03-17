@@ -66,6 +66,9 @@ def clean_title(title):
     
     #print(f"After selective emoji removal: {result}")
     
+    # Convert full-width spaces (U+3000) to regular spaces for consistent processing
+    result = result.replace('\u3000', ' ')
+    
     # Now process non-Japanese parts to replace spaces and pipes
     # We'll keep track of segments again
     final_result = ""
@@ -95,6 +98,10 @@ def clean_title(title):
     
     # Clean up multiple underscores
     final_result = re.sub(r'_+', '_', final_result)
+    
+    # Final step: clean any remaining spaces, including full-width spaces
+    final_result = re.sub(r'[\s\u3000]+', '_', final_result)
+    
     #print(f"Final title: {final_result}")
     
     return final_result.rstrip('_')
