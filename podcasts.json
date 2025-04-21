@@ -1,0 +1,26 @@
+{
+  "youtube_url":"https://www.youtube.com/feeds/videos.xml",
+  "data_root": "/Users/eric/Documents/GitHub/podpilot-data",
+  "podcasts": [
+    {
+      "channel_name_short": "hnh",
+      "channel_name_long":"Haru no nihongo",
+      "channel_id": "UCauyM-A8JIJ9NQcw5_jF00Q"
+    },
+    {
+      "channel_name_short": "sjn",
+      "channel_name_long":"Speak Japanese Naturally",
+      "channel_id": "UC_NROu3WWx1KZ7tNl275F7A"
+    },
+    {
+      "channel_name_short": "ss",
+      "channel_name_long":"Sayuri Saying",
+      "channel_id": "UCqMY-cp1He6IAi1cIz-gX1g"
+    },
+    { 
+      "channel_name_short": "yuyu",
+      "channel_name_long":"Yuyu no nihongo",
+      "channel_id": "UC8dWfySP_cKDMFj6aFfQbFA"
+    }
+  ]
+}
