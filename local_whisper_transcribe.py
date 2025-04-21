@@ -76,7 +76,7 @@ def find_whisper_executable():
     return shutil.which("whisper-cli")
 
 def transcribe_audio(file_path, model_config, language="ja"):
-    """Transcribe audio using whisper-cli"""
+    """Transcribe audio using whisper-cli with sentence segmentation"""
     try:
         print(f"Transcribing: {file_path}")
         
@@ -101,7 +101,7 @@ def transcribe_audio(file_path, model_config, language="ja"):
             whisper_executable,
             "-m", model_path,
             "-l", language,
-            "-otxt",  # Output as text
+            #"-otxt",  # Output as text
             "-f", str(file_path)
         ]
         
@@ -119,14 +119,18 @@ def transcribe_audio(file_path, model_config, language="ja"):
         # Clean the text (remove timestamps)
         clean_text = clean_transcript(output_text)
         
-        # Create the output path with the correct extension
-        # Use the same filename but with .txt extension instead of adding .txt
-        input_file_path = Path(file_path)
-        text_path = input_file_path.with_suffix('.txt')
+        # Segment into sentences
+        sentences = segment_japanese_text(clean_text)
         
-        # Save plain text without timestamps
+        # Create the output path with the correct extension
+        input_file_path = Path(file_path)
+        base_filename = input_file_path.stem
+        text_path = input_file_path.parent / f"{base_filename}.txt"
+        
+        # Save plain text with one sentence per line
         with open(text_path, 'w', encoding='utf-8') as f:
-            f.write(clean_text)
+            for sentence in sentences:
+                f.write(f"{sentence}\n")
             
         print(f"Plain text saved to {text_path}")
         return True
@@ -134,6 +138,45 @@ def transcribe_audio(file_path, model_config, language="ja"):
     except Exception as e:
         print(f"Error transcribing {file_path}: {e}")
         return False
+
+def segment_japanese_text(text):
+    """Split Japanese text into sentences.
+    
+    Japanese sentences typically end with punctuation marks like 。, ？, or ！.
+    This function splits the text at these marks and ensures each sentence is on its own line.
+    """
+    # Define Japanese sentence-ending punctuation
+    end_marks = ['。', '？', '！', '…']
+    
+    # Split the text into initial chunks based on line breaks
+    chunks = text.split('\n')
+    sentences = []
+    
+    for chunk in chunks:
+        if not chunk.strip():
+            continue
+            
+        # Current position in the chunk
+        current_pos = 0
+        chunk_len = len(chunk)
+        
+        # Process the chunk character by character
+        for i in range(chunk_len):
+            # Check if this character is a sentence-ending punctuation
+            if i < chunk_len and chunk[i] in end_marks:
+                # Extract the sentence (including the ending punctuation)
+                sentence = chunk[current_pos:i+1].strip()
+                if sentence:
+                    sentences.append(sentence)
+                current_pos = i + 1
+        
+        # Add any remaining text as a sentence
+        if current_pos < chunk_len:
+            remaining = chunk[current_pos:].strip()
+            if remaining:
+                sentences.append(remaining)
+    
+    return sentences
 
 
 def load_metadata(metadata_file):
