@@ -58,86 +58,133 @@ def check_existing_transcription(file_path):
     txt_exists = base_path.with_suffix('.txt').exists()
     return json_exists or txt_exists
 
-def clean_transcript(text):
-    """Remove timestamps from transcription"""
-    # Pattern to match timestamp lines like [00:00:00.000 --> 00:00:02.000]
-    pattern = r'\[\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}\]\s*'
-    
-    # Remove timestamps
-    clean_text = re.sub(pattern, '', text)
-    
-    # Remove any extra whitespace
-    clean_text = re.sub(r'\s+', ' ', clean_text)
-    
-    return clean_text.strip()
-
 def find_whisper_executable():
     """Find the whisper-cli executable in PATH"""
     return shutil.which("whisper-cli")
 
-def transcribe_audio(file_path, model_config, language="ja"):
-    """Transcribe audio using whisper-cli with sentence segmentation"""
+def parse_srt_to_segments(srt_path):
+    segments = []
+    with open(srt_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    blocks = content.strip().split('\n\n')
+    for block in blocks:
+        lines = block.strip().split('\n')
+        if len(lines) >= 3:
+            timestamp_line = lines[1]
+            text = ' '.join(lines[2:]).strip()
+            match = re.match(r'(\d{2}:\d{2}:\d{2}),\d{3} --> (\d{2}:\d{2}:\d{2}),\d{3}', timestamp_line)
+            if match:
+                start_time = match.group(1) + '.000'
+                end_time = match.group(2) + '.000'
+                segments.append({'start': start_time, 'end': end_time, 'text': text})
+    return segments
+
+def transcribe_audio(file_path, model_config, language="ja", test_duration=None, video_id=None):
     try:
         print(f"Transcribing: {file_path}")
-        
-        # Get configuration for transcription
+
         whisper_executable = model_config.get("executable")
         model_path = model_config.get("model_path")
-        
+
         if not whisper_executable:
             print("Error: whisper-cli executable not found in PATH")
             return False
-            
-        if not model_path:
-            print("Error: Model path not specified")
-            return False
-            
-        if not os.path.exists(model_path):
-            print(f"Error: Model file not found at {model_path}")
-            return False
-        
-        # Create command
+
+        input_file_path = Path(file_path)
+        base_filename = input_file_path.stem
+        output_dir = input_file_path.parent
+        srt_path = input_file_path.with_suffix(input_file_path.suffix + ".srt")
+        text_path = output_dir / f"{base_filename}.txt"
+
         cmd = [
             whisper_executable,
             "-m", model_path,
             "-l", language,
-            #"-otxt",  # Output as text
-            "-f", str(file_path)
+            "-osrt",
+            "-f", str(input_file_path)
         ]
-        
-        # Run the command
+
+        if test_duration is not None and test_duration >= 1:
+            ms_duration = max(int(test_duration * 1000), 1000)
+            cmd.extend(["-d", str(ms_duration)])
+
         print(f"Running command: {' '.join(cmd)}")
         process = subprocess.run(cmd, capture_output=True, text=True)
-        
+
         if process.returncode != 0:
             print(f"Error running whisper-cli: {process.stderr}")
             return False
-        
-        # Get output text
-        output_text = process.stdout
-        
-        # Clean the text (remove timestamps)
-        clean_text = clean_transcript(output_text)
-        
-        # Segment into sentences
-        sentences = segment_japanese_text(clean_text)
-        
-        # Create the output path with the correct extension
-        input_file_path = Path(file_path)
-        base_filename = input_file_path.stem
-        text_path = input_file_path.parent / f"{base_filename}.txt"
-        
-        # Save plain text with one sentence per line
+
+        print(f"Checking for SRT file at: {srt_path}")
+        if not srt_path.exists():
+            print(f"Error: SRT file not found at {srt_path}")
+            return False
+
+        segments = parse_srt_to_segments(srt_path)
+        print(f"Parsed {len(segments)} segments from SRT file")
+        if not segments:
+            print("No segments found in SRT file")
+            return False
+
+        if not video_id:
+            video_id = get_video_id_from_metadata(file_path)
+
         with open(text_path, 'w', encoding='utf-8') as f:
-            for sentence in sentences:
-                f.write(f"{sentence}\n")
-            
-        print(f"Plain text saved to {text_path}")
+            for segment in segments:
+                start_time = segment['start']
+                text = segment['text']
+                h, m, s = start_time.split(':')
+                total_seconds = int(h) * 3600 + int(m) * 60 + int(float(s))
+                timestamp = f"[{start_time}]"
+                if video_id:
+                    youtube_link = f"https://www.youtube.com/watch?v={video_id}&t={total_seconds}"
+                    f.write(f"{timestamp} {youtube_link}\n")
+                else:
+                    f.write(f"{timestamp}\n")
+                f.write(f"{text}\n\n")
+        print(f"Formatted transcript saved to {text_path}")
         return True
-            
+
     except Exception as e:
         print(f"Error transcribing {file_path}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
+
+def get_video_id_from_metadata(file_path):
+    """Try to extract YouTube video ID from metadata file or filename"""
+    try:
+        # Get the base name of the audio file
+        base_name = Path(file_path).stem
+        
+        # Check if metadata file exists in the same directory
+        metadata_path = Path(file_path).parent.parent / f"{Path(file_path).parent.name}.json"
+        
+        if metadata_path.exists():
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+            # Look for the video with matching filename
+            for video in metadata.get('videos', []):
+                if video.get('clean_filename') == base_name:
+                    # Check for video ID or URL
+                    video_id = video.get('id')
+                    
+                    # If it's a URL, extract the ID
+                    if video_id and ('youtube.com' in video_id or 'youtu.be' in video_id):
+                        if 'youtube.com/watch?v=' in video_id:
+                            return video_id.split('youtube.com/watch?v=')[1].split('&')[0]
+                        elif 'youtu.be/' in video_id:
+                            return video_id.split('youtu.be/')[1].split('?')[0]
+                    else:
+                        # It might be just the ID
+                        return video_id
+        
+        return None
+    except Exception as e:
+        print(f"Error extracting video ID: {e}")
+        return None
 
 def segment_japanese_text(text):
     """Split Japanese text into sentences.
@@ -227,6 +274,8 @@ def main():
                        help='Retranscribe files even if they already have transcriptions')
     parser.add_argument('--single-file', help='Transcribe a single file instead of a directory')
     parser.add_argument('--model-path', help='Path to whisper.cpp model file')
+    parser.add_argument('--test-duration', type=float, 
+                   help='Process only this many seconds of audio (minimum 1 second)')
     args = parser.parse_args()
     
     # Get configuration
@@ -256,7 +305,7 @@ def main():
             print(f"Error: File not found: {args.single_file}")
             exit(1)
             
-        success = transcribe_audio(file_path, config, args.language)
+        success = transcribe_audio(file_path, config, args.language, args.test_duration)
         exit(0 if success else 1)
     
     # If we're here, we need audio_dir
@@ -361,7 +410,7 @@ def main():
     failed = 0
     
     for audio_file, file_date in tqdm(files_to_process, desc="Transcribing files"):
-        if transcribe_audio(str(audio_file), config, args.language):
+        if transcribe_audio(str(audio_file), config, args.language, args.test_duration):
             success += 1
         else:
             failed += 1
