@@ -182,11 +182,19 @@ def download_audio_from_youtube(url, output_path):
         }],
         'progress_hooks': [lambda d: print(f"Download progress: {d['status']}", end='\r') 
                           if d['status'] != 'finished' else print("\nDownload complete, post-processing...")],
+        'quiet': True,  # Suppress most output
+        'no_warnings': True,  # Suppress warnings
+        'extract_flat': False,  # Don't extract playlist info
+        'ignoreerrors': True,  # Continue on download errors
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            try:
+                ydl.download([url])
+            except Exception as e:
+                print(f"\nError during YouTube download: {str(e)}")
+                return False
         
         # Check if the file was created with the correct extension
         expected_path = output_path.replace('.mp3', '') + '.mp3'
@@ -350,9 +358,22 @@ def main():
     parser.add_argument('--to-date', type=parse_date_arg, help='End date (YYYY-MM-DD)')
     parser.add_argument('-s', '--simulate', action='store_true',
                        help='Simulation mode: show what would be done without doing it')
+    parser.add_argument('--id', help='Download specific video by ID')
     args = parser.parse_args()
     
     json_data = load_json(args.json_file)
+    
+    # If ID is specified, only download that specific video
+    if args.id:
+        for video in json_data['videos']:
+            if video.get('id') == args.id:
+                # Create a single-item list with just this video
+                json_data['videos'] = [video]
+                break
+        else:
+            print(f"Error: No video found with ID {args.id}")
+            return
+    
     download_mode(json_data, args.audio_dir, args)
 
 if __name__ == '__main__':
