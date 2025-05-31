@@ -80,6 +80,24 @@ def parse_srt_to_segments(srt_path):
                 segments.append({'start': start_time, 'end': end_time, 'text': text})
     return segments
 
+def write_clean_transcript(text_path):
+    clean_path = text_path.with_name(text_path.stem + "_transcript.txt")
+    with open(text_path, "r", encoding="utf-8") as fin, open(clean_path, "w", encoding="utf-8") as fout:
+        block = []
+        for line in fin:
+            # Skip lines with timestamp and YouTube URL
+            if re.match(r'^\[\d{2}:\d{2}:\d{2}\.\d{3}\] https://www\.youtube\.com/watch\?v=[^&\s]+&t=\d+', line):
+                continue
+            # Write block on blank line
+            if line.strip() == "":
+                if block:
+                    fout.write("".join(block).strip() + "\n\n")
+                    block = []
+            else:
+                block.append(line)
+        if block:
+            fout.write("".join(block).strip() + "\n")
+
 def transcribe_audio(file_path, model_config, language="ja", test_duration=None, video_id=None):
     try:
         print(f"Transcribing: {file_path}")
@@ -144,6 +162,9 @@ def transcribe_audio(file_path, model_config, language="ja", test_duration=None,
                     f.write(f"{timestamp}\n")
                 f.write(f"{text}\n\n")
         print(f"Formatted transcript saved to {text_path}")
+        # Write clean transcript
+        write_clean_transcript(text_path)
+        print(f"Clean transcript saved to {text_path.with_name(text_path.stem + '_transcript.txt')}")
         return True
 
     except Exception as e:
