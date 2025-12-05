@@ -7,15 +7,17 @@ import json
 from datetime import datetime
 from datetime import timezone
 import sys
-import urllib.request
-import xml.etree.ElementTree as ET
-import re
-import importlib.util
 
 # Import functions from other modules
 from find_podcasts import clean_title, fetch_rss_feed, parse_rss_feed
 from download_audio import download_file, process_existing_file
-from mp3_transcoder import transcode
+
+# Constants
+WHISPER_MODEL = "whisper-1"
+TRANSCRIPTION_LANGUAGE = "ja"
+TRANSCRIPTION_PROMPT = "この音声は日本語です。できるだけ正確に文字起こししてください。文末に改行を入れてください."
+DEFAULT_FILE_HOUR = 12  # Default hour for file dates (noon UTC)
+YOUTUBE_VIDEO_ID_LENGTH = 11  # Standard YouTube video ID length
 
 def print_step(message):
     """Print a step header to make progress clear"""
@@ -51,30 +53,53 @@ def get_file_date(filename):
     try:
         date_str = filename.split('_')[0]
         date = datetime.strptime(date_str, '%Y-%m-%d')
-        return date.replace(hour=12, tzinfo=timezone.utc)
+        return date.replace(hour=DEFAULT_FILE_HOUR, tzinfo=timezone.utc)
     except (ValueError, IndexError):
         return None
+
+def parse_date_string(date_str):
+    """Parse a date string in various formats to a datetime object.
+    
+    Supports:
+    - ISO format (with or without 'Z' timezone)
+    - 'YYYY-MM-DD HH:MM' format
+    - 'YYYY-MM-DD' format
+    
+    Returns datetime with UTC timezone, or None if parsing fails.
+    """
+    if not date_str:
+        return None
+    
+    if isinstance(date_str, datetime):
+        return date_str
+    
+    try:
+        # Try ISO format first
+        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    except ValueError:
+        try:
+            # Try 'YYYY-MM-DD HH:MM' format
+            date = datetime.strptime(date_str, '%Y-%m-%d %H:%M')
+            return date.replace(tzinfo=timezone.utc)
+        except ValueError:
+            try:
+                # Try 'YYYY-MM-DD' format
+                date = datetime.strptime(date_str, '%Y-%m-%d')
+                return date.replace(tzinfo=timezone.utc)
+            except ValueError:
+                return None
 
 def is_date_in_range(date, from_date, to_date):
     """Check if date falls within specified range"""
     if not date:
         return False
     
-    if isinstance(date, str):
-        try:
-            date = datetime.fromisoformat(date.replace('Z', '+00:00'))
-        except ValueError:
-            try:
-                date = datetime.strptime(date, '%Y-%m-%d %H:%M')
-                date = date.replace(tzinfo=timezone.utc)
-            except ValueError:
-                try:
-                    date = datetime.strptime(date, '%Y-%m-%d')
-                    date = date.replace(tzinfo=timezone.utc)
-                except ValueError:
-                    return False
+    # Parse date string if needed
+    parsed_date = parse_date_string(date) if isinstance(date, str) else date
+    if not parsed_date:
+        return False
     
-    date_only = date.date()
+    date_only = parsed_date.date()
     
     if from_date and date_only < from_date.date():
         return False
@@ -97,11 +122,11 @@ def transcribe_audio(file_path, client):
         print(f"Starting transcription of {os.path.basename(file_path)}...")
         with open(file_path, "rb") as audio_file:
             transcript = client.audio.transcriptions.create(
-                model="whisper-1",
+                model=WHISPER_MODEL,
                 file=audio_file,
                 response_format="verbose_json",
-                language="ja",
-                prompt="この音声は日本語です。できるだけ正確に文字起こししてください。文末に改行を入れてください."
+                language=TRANSCRIPTION_LANGUAGE,
+                prompt=TRANSCRIPTION_PROMPT
             )
             
             transcript_dict = transcript.model_dump()
@@ -134,11 +159,11 @@ def load_config(config_file):
         # Validate required fields
         if "data_root" not in config:
             raise ValueError("Config file missing 'data_root' field")
-        if "podcasts" not in config or not isinstance(config["podcasts"], list):
-            raise ValueError("Config file missing 'podcasts' list or it's not a list")
+        if "youtube_channels" not in config or not isinstance(config["youtube_channels"], list):
+            raise ValueError("Config file missing 'youtube_channels' list or it's not a list")
         
         # Validate each podcast entry
-        for i, podcast in enumerate(config["podcasts"]):
+        for i, podcast in enumerate(config["youtube_channels"]):
             if "channel_name_short" not in podcast:
                 raise ValueError(f"Podcast at index {i} missing 'channel_name_short'")
             if "channel_name_long" not in podcast:
@@ -155,19 +180,19 @@ def load_config(config_file):
 
 def find_podcast_by_name(config, name):
     """Find a podcast in the config by its channel_name_short"""
-    for podcast in config["podcasts"]:
+    for podcast in config["youtube_channels"]:
         if podcast["channel_name_short"] == name:
             return podcast
     
     # Podcast not found, list available options
-    available = [p["channel_name_short"] for p in config["podcasts"]]
+    available = [p["channel_name_short"] for p in config["youtube_channels"]]
     raise ValueError(f"Podcast '{name}' not found in config. Available options: {', '.join(available)}")
 
 def list_podcasts(config):
     """List all podcasts in the config"""
     print_step("Available Podcasts")
     
-    for i, podcast in enumerate(config["podcasts"], 1):
+    for i, podcast in enumerate(config["youtube_channels"], 1):
         print(f"{i}. {podcast['channel_name_short']} - {podcast['channel_name_long']}")
         print(f"   Channel ID: {podcast['channel_id']}")
     
@@ -229,7 +254,8 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
     print_substep("Downloading audio files")
     
     # Create output directory if it doesn't exist
-    os.makedirs(audio_dir, exist_ok=True)
+    audio_path = Path(audio_dir)
+    audio_path.mkdir(parents=True, exist_ok=True)
     
     # Load JSON data
     json_data = load_json(json_file)
@@ -237,7 +263,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
         return False
     
     # Get list of existing files
-    existing_files = set(os.listdir(audio_dir))
+    existing_files = {f.name for f in audio_path.iterdir() if f.is_file()}
     
     downloads = []
     process_existing = []
@@ -263,7 +289,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
                 url_value = video[url_field]
                 
                 # Handle YouTube video IDs
-                if url_field == 'id' and len(url_value) == 11 and not url_value.startswith('http'):
+                if url_field == 'id' and len(url_value) == YOUTUBE_VIDEO_ID_LENGTH and not url_value.startswith('http'):
                     url = f"https://www.youtube.com/watch?v={url_value}"
                 else:
                     url = url_value
@@ -274,19 +300,11 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
             print(f"Warning: No URL found for video {title}")
             continue
         
-        # Parse the date
-        try:
-            if 'T' in date_str:  # ISO format
-                date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            else:  # Simple date format
-                date = datetime.strptime(date_str, '%Y-%m-%d %H:%M')
-        except ValueError:
-            try:
-                # Try alternate format
-                date = datetime.strptime(date_str, '%Y-%m-%d')
-            except ValueError:
-                print(f"Warning: Could not parse date {date_str} for video {title}")
-                continue
+        # Parse the date using shared utility function
+        date = parse_date_string(date_str)
+        if not date:
+            print(f"Warning: Could not parse date {date_str} for video {title}")
+            continue
         
         # Use clean_filename from find_podcasts if available, otherwise generate one
         if 'clean_filename' in video:
@@ -297,7 +315,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
             date_prefix = date.strftime('%Y-%m-%d')
             filename = f"{date_prefix}_{clean_title_str}.mp3"
         
-        output_path = os.path.join(audio_dir, filename)
+        output_path = Path(audio_dir) / filename
 
         if filename in existing_files and not force_download:
             process_existing.append((output_path, date))
@@ -324,7 +342,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
     
     # Process existing files
     for file_path, _ in process_existing:
-        process_existing_file(file_path, simulate)
+        process_existing_file(str(file_path), simulate)
     
     if simulate:
         print("\nSimulation mode: would download files")
@@ -478,15 +496,23 @@ def process_transcriptions(audio_dir, json_file, from_date, to_date, retranscrib
     return True
 
 def main():
-    parser = argparse.ArgumentParser(description='Podcast downloading and transcription tool')
+    parser = argparse.ArgumentParser(
+        description='Podcast downloading and transcription tool',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage='%(prog)s [-h] [--config CONFIG] (--name NAME | --list) [options]',
+        epilog='''REQUIRED: Either --name or --list must be provided.
+  --name: Process a specific podcast (REQUIRED unless using --list)
+  --list: List all podcasts in config file (alternative to --name)'''
+    )
     
-    parser.add_argument('--config', required=True, help='JSON config file with podcast information')
-    parser.add_argument('--name', help='Short name of the podcast to process (from config file)')
-    parser.add_argument('--list', action='store_true', help='List all podcasts in the config')
+    parser.add_argument('--config', default='config/podcasts.json', 
+                       help='JSON config file with podcast information (default: config/podcasts.json)')
+    parser.add_argument('--name', help='Short name of the podcast to process from config file (REQUIRED unless using --list)')
+    parser.add_argument('--list', action='store_true', help='List all podcasts in the config (alternative to --name)')
     
     # Date range options
-    parser.add_argument('--from-date', type=parse_date_arg, help='Start date (YYYY-MM-DD)')
-    parser.add_argument('--to-date', type=parse_date_arg, help='End date (YYYY-MM-DD)')
+    parser.add_argument('-f', '--from-date', type=parse_date_arg, help='Start date (YYYY-MM-DD)')
+    parser.add_argument('-t', '--to-date', type=parse_date_arg, help='End date (YYYY-MM-DD)')
     
     # Processing options
     parser.add_argument('--download', action='store_true', help='Force download of audio files even if they exist')
@@ -494,6 +520,13 @@ def main():
     parser.add_argument('--force', action='store_true', help='Force all operations regardless of existing files')
     parser.add_argument('-s', '--simulate', action='store_true', help='Simulation mode (no actual downloads/transcriptions)')
     parser.add_argument('--api-key', help='OpenAI API key (or set OPENAI_API_KEY env variable)')
+    
+    # If run with no arguments, show usage and help to explain how to drive the tool.
+    if len(sys.argv) == 1:
+        parser.print_usage()
+        print()
+        parser.print_help()
+        return 1
     
     args = parser.parse_args()
     

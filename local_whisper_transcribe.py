@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 import argparse
 from pathlib import Path
 import json
@@ -9,6 +10,7 @@ import subprocess
 from tqdm import tqdm
 from datetime import timezone
 import shutil
+from find_podcasts import load_config, find_podcast_by_name, sanitize_filename
 
 def parse_date_arg(date_str):
     """Parse date argument from command line"""
@@ -85,8 +87,12 @@ def write_clean_transcript(text_path):
     with open(text_path, "r", encoding="utf-8") as fin, open(clean_path, "w", encoding="utf-8") as fout:
         block = []
         for line in fin:
-            # Skip lines with timestamp and YouTube URL
+            # Skip lines with timestamps (with or without YouTube URL)
+            # Pattern 1: Timestamp with YouTube URL
             if re.match(r'^\[\d{2}:\d{2}:\d{2}\.\d{3}\] https://www\.youtube\.com/watch\?v=[^&\s]+&t=\d+', line):
+                continue
+            # Pattern 2: Timestamp only (no URL)
+            if re.match(r'^\[\d{2}:\d{2}:\d{2}\.\d{3}\]\s*$', line):
                 continue
             # Write block on blank line
             if line.strip() == "":
@@ -186,21 +192,40 @@ def get_video_id_from_metadata(file_path):
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
             
+            # Use sanitize_filename for consistent matching (handles underscore differences)
+            from find_podcasts import sanitize_filename
+            sanitized_base_name = sanitize_filename(base_name)
+            
             # Look for the video with matching filename
             for video in metadata.get('videos', []):
-                if video.get('clean_filename') == base_name:
-                    # Check for video ID or URL
-                    video_id = video.get('id')
-                    
-                    # If it's a URL, extract the ID
-                    if video_id and ('youtube.com' in video_id or 'youtu.be' in video_id):
-                        if 'youtube.com/watch?v=' in video_id:
-                            return video_id.split('youtube.com/watch?v=')[1].split('&')[0]
-                        elif 'youtu.be/' in video_id:
-                            return video_id.split('youtu.be/')[1].split('?')[0]
-                    else:
-                        # It might be just the ID
-                        return video_id
+                clean_fn = video.get('clean_filename', '')
+                if clean_fn:
+                    sanitized_clean_fn = sanitize_filename(clean_fn)
+                    if sanitized_clean_fn == sanitized_base_name:
+                        # Check for video ID or URL
+                        video_id = video.get('id')
+                        
+                        # If it's a URL, extract the ID
+                        if video_id and ('youtube.com' in video_id or 'youtu.be' in video_id):
+                            if 'youtube.com/watch?v=' in video_id:
+                                return video_id.split('youtube.com/watch?v=')[1].split('&')[0]
+                            elif 'youtu.be/' in video_id:
+                                return video_id.split('youtu.be/')[1].split('?')[0]
+                        elif video_id:
+                            # It might be just the ID (clean it - remove leading/trailing underscores)
+                            cleaned_id = video_id.strip('_')
+                            # If it starts with underscore, it's likely part of the filename, extract just the ID part
+                            if cleaned_id and len(cleaned_id) == 11:  # YouTube IDs are 11 characters
+                                return cleaned_id
+                            # Otherwise try to extract from the ID if it contains the actual ID
+                            # Sometimes the ID might be like "_iwGxHbltp4" - extract the last 11 chars
+                            if len(video_id) >= 11:
+                                # Try to find a valid YouTube ID pattern (11 alphanumeric chars)
+                                import re
+                                id_match = re.search(r'([A-Za-z0-9_-]{11})', video_id)
+                                if id_match:
+                                    return id_match.group(1).strip('_')
+                            return cleaned_id if cleaned_id else video_id
         
         return None
     except Exception as e:
@@ -248,25 +273,30 @@ def segment_japanese_text(text):
 
 
 def load_metadata(metadata_file):
-    """Load metadata from JSON file and extract valid filenames"""
+    """Load metadata from JSON file and return the full metadata dictionary"""
     try:
         with open(metadata_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
         if 'videos' not in data:
             print(f"Error: Invalid metadata format. 'videos' key not found in {metadata_file}")
-            return set()
+            return None
             
-        valid_filenames = set()
-        for video in data['videos']:
-            # Check for clean_filename field, which is used in download_audio.py
-            if 'clean_filename' in video:
-                valid_filenames.add(f"{video['clean_filename']}.mp3")
-                
-        return valid_filenames
+        return data  # Return the full metadata dictionary instead of just filenames
     except Exception as e:
         print(f"Error loading metadata file {metadata_file}: {e}")
-        return set()
+        return None
+
+def expand_env_vars(value: str) -> str:
+    """Expand environment variables in a string (supports $VAR and ${VAR} syntax)"""
+    if not isinstance(value, str):
+        return value
+    import re
+    # Replace ${VAR} or $VAR with environment variable value
+    def replace_var(match):
+        var_name = match.group(1) or match.group(2)
+        return os.environ.get(var_name, match.group(0))  # Return original if not found
+    return re.sub(r'\$\{(\w+)\}|\$(\w+)', replace_var, value)
 
 def get_config_from_environment():
     """Get configuration from environment variables"""
@@ -284,19 +314,64 @@ def get_config_from_environment():
         
     return config
 
+def find_audio_path_by_id(metadata, video_id, audio_dir):
+    for video in metadata.get('videos', []):
+        if video.get('id') == video_id:
+            clean_filename = video.get('clean_filename')
+            if clean_filename:
+                return str(Path(audio_dir) / (clean_filename + '.mp3'))
+    return None
+
 def main():
-    parser = argparse.ArgumentParser(description='Transcribe audio files using whisper-cli')
-    parser.add_argument('audio_dir', nargs='?', help='Directory containing audio files (not required with --single-file)')
-    parser.add_argument('--metadata-file', help='JSON file containing video metadata (optional)')
-    parser.add_argument('--from-date', type=parse_date_arg, help='Start date (YYYY-MM-DD)')
-    parser.add_argument('--to-date', type=parse_date_arg, help='End date (YYYY-MM-DD)')
-    parser.add_argument('--language', default='ja', help='Language code (default: ja for Japanese)')
+    parser = argparse.ArgumentParser(
+        description='Transcribe audio files using local whisper-cli. '
+                    'Requires WHISPER_MODEL_PATH environment variable or --model-path option.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage='%(prog)s [-h] [--config CONFIG] [--name NAME] [options]',
+        epilog='''Metadata file selection:
+  Config-based: use --name (requires --config, which defaults to config/podcasts.json)
+
+Examples:
+  # Transcribe single file:
+  local_whisper_transcribe.py --single-file audio.mp3
+
+  # Transcribe directory with date filter (using config):
+  local_whisper_transcribe.py --name hnh -a ./audio --from-date 2024-01-01 --to-date 2024-01-31
+
+  # Transcribe by video ID (using config):
+  local_whisper_transcribe.py --name hnh --id abc123 -a ./audio'''
+    )
+    parser.add_argument('--config', default='config/podcasts.json',
+                       help='Path to podcasts.json config file (default: config/podcasts.json, use with --name)')
+    parser.add_argument('--name',
+                       help='Short name of the podcast from config file. Use with --config to find metadata JSON file.')
+    parser.add_argument('-f', '--from-date', type=parse_date_arg, 
+                       help='Start date for filtering files (YYYY-MM-DD or ISO format). Use with --to-date for date range.')
+    parser.add_argument('-t', '--to-date', type=parse_date_arg, 
+                       help='End date for filtering files (YYYY-MM-DD or ISO format). Use with --from-date for date range.')
+    parser.add_argument('--language', default='ja', 
+                       help='Language code for transcription (default: ja for Japanese). Examples: en, ja, es, fr')
     parser.add_argument('--retranscribe', action='store_true', 
-                       help='Retranscribe files even if they already have transcriptions')
-    parser.add_argument('--single-file', help='Transcribe a single file instead of a directory')
-    parser.add_argument('--model-path', help='Path to whisper.cpp model file')
+                       help='Retranscribe files even if transcription files (.json or .txt) already exist')
+    parser.add_argument('--single-file', 
+                       help='Transcribe a single file instead of processing a directory. Overrides -a option.')
+    parser.add_argument('--model-path', 
+                       help='Path to whisper.cpp model file. Overrides WHISPER_MODEL_PATH environment variable.')
     parser.add_argument('--test-duration', type=float, 
-                   help='Process only this many seconds of audio (minimum 1 second)')
+                       help='Process only this many seconds of audio (minimum 1 second). Useful for testing.')
+    parser.add_argument('--id', 
+                       help='Transcribe file by video ID from metadata. Requires --name and -a/--audio-dir options.')
+    parser.add_argument('-a', '--audio-dir',
+                       help='Directory containing audio files. Required when processing directory (not with --single-file). Also required with --id.',
+                       dest='audio_dir')
+    
+    # If run with no arguments, show usage and help to guide the user.
+    if len(sys.argv) == 1:
+        parser.print_usage()
+        print()
+        parser.print_help()
+        sys.exit(1)
+    
     args = parser.parse_args()
     
     # Get configuration
@@ -306,34 +381,78 @@ def main():
     if args.model_path:
         config["model_path"] = args.model_path
     
-    # Check if we have the required configuration
-    if "executable" not in config:
-        print("Error: whisper-cli executable not found in PATH")
-        exit(1)
-        
-    if "model_path" not in config:
-        print("Error: Model path not specified. Please set WHISPER_MODEL_PATH environment variable or use --model-path")
-        print("Example: export WHISPER_MODEL_PATH=/path/to/ggml-large-v2.bin")
-        exit(1)
-        
-    print(f"Using whisper executable: {config['executable']}")
-    print(f"Using model: {config['model_path']}")
+    # Determine metadata file from args (config + name mode)
+    metadata_file = None
+    config_data = None
+    if args.name:
+        try:
+            config_data = load_config(args.config)
+            podcast = find_podcast_by_name(config_data, args.name)
+            
+            # Apply transcription settings from config if present
+            transcription_cfg = config_data.get("transcription", {})
+            provider = transcription_cfg.get("provider")
+            if provider and provider not in ("whisper.cpp", "whispercpp"):
+                parser.error(f"Transcription provider '{provider}' is not supported in local_whisper_transcribe.py (only whisper.cpp).")
+            # Resolve model_path: prefer CLI, then env from get_config_from_environment, then config
+            if "model_path" not in config:
+                mp_cfg = transcription_cfg.get("model_path")
+                if mp_cfg:
+                    # Expand environment variables in model_path
+                    config["model_path"] = expand_env_vars(mp_cfg)
+            if "executable" not in config and "executable" in transcription_cfg:
+                config["executable"] = transcription_cfg["executable"]
+            
+            # Use data_root from config to find metadata file (same pattern as other scripts)
+            data_root = Path(config_data.get("data_root", "."))
+            channel_name = podcast["channel_name_short"]
+            metadata_file = str(data_root / f"{channel_name}.json")
+            
+            # If audio_dir not specified, use data_root/channel_name (like other scripts)
+            if not args.audio_dir:
+                args.audio_dir = str(data_root / channel_name)
+        except ValueError as e:
+            parser.error(f"Error: {e}")
     
-    # Handle single file mode
+    # Validate required arguments before processing IDs
+    if args.id:
+        if not args.name or not args.audio_dir:
+            parser.error('--name and -a/--audio-dir are required with --id')
+    
     if args.single_file:
         file_path = Path(args.single_file)
         if not file_path.exists():
-            print(f"Error: File not found: {args.single_file}")
-            exit(1)
-            
-        success = transcribe_audio(file_path, config, args.language, args.test_duration)
-        exit(0 if success else 1)
+            parser.error(f'File not found: {args.single_file}')
     
-    # If we're here, we need audio_dir
-    if not args.audio_dir:
-        print("Error: audio_dir is required when not using --single-file")
-        parser.print_help()
+    if not args.single_file and not args.audio_dir:
+        parser.error("-a/--audio-dir is required when not using --single-file")
+    
+    if "executable" not in config:
+        print("Error: whisper-cli executable not found in PATH and not set in config")
         exit(1)
+        
+    if "model_path" not in config:
+        print("Error: Model path not specified. Set transcription.model_path in config or use --model-path/WHISPER_MODEL_PATH")
+        exit(1)
+    
+    print(f"Using whisper executable: {config['executable']}")
+    print(f"Using model: {config['model_path']}")
+    
+    if args.id:
+        metadata = load_metadata(metadata_file)
+        if not metadata:
+            parser.error(f"Error loading metadata file: {metadata_file}")
+        file_path = find_audio_path_by_id(metadata, args.id, args.audio_dir)
+        if file_path is None:
+            parser.error(f'Video ID {args.id} not found in metadata file')
+        if not Path(file_path).exists():
+            parser.error(f'Audio file for ID {args.id} not found in directory: {file_path}')
+        transcribe_audio(file_path, config, args.language, args.test_duration)
+        exit(0)
+
+    if args.single_file:
+        transcribe_audio(str(file_path), config, args.language, args.test_duration)
+        exit(0)
         
     # Check audio directory
     audio_path = Path(args.audio_dir)
@@ -342,28 +461,39 @@ def main():
         exit(1)
     
     # Get list of MP3 files
-    if args.metadata_file:
+    if metadata_file:
         # Use metadata file to filter valid files
-        valid_filenames = load_metadata(args.metadata_file)
-        if not valid_filenames:
-            print(f"No valid filenames found in metadata file: {args.metadata_file}")
+        metadata = load_metadata(metadata_file)
+        if not metadata:
+            print(f"Error loading metadata file: {metadata_file}")
             exit(1)
-            
+        
+        # Sanitize metadata filenames to match what might be on disk
+        valid_filenames = {sanitize_filename(f"{video['clean_filename']}.mp3") for video in metadata.get('videos', [])}
         print(f"Found {len(valid_filenames)} valid files in metadata")
         
-        # Get list of MP3 files that match the metadata
+        # Get all MP3 files in directory and match them to metadata
+        all_mp3_files = list(audio_path.glob('*.mp3'))
         mp3_files = []
-        for filename in valid_filenames:
-            file_path = audio_path / filename
-            if file_path.exists():
-                mp3_files.append(file_path)
+        
+        # Create a mapping of sanitized filenames to actual file paths
+        sanitized_to_file = {sanitize_filename(f.name): f for f in all_mp3_files}
+        
+        # Match metadata filenames to actual files
+        for metadata_filename in valid_filenames:
+            if metadata_filename in sanitized_to_file:
+                mp3_files.append(sanitized_to_file[metadata_filename])
+        
+        # If no matches found, fall back to using all MP3 files in directory
+        if not mp3_files and all_mp3_files:
+            print(f"Warning: No metadata matches found, using all {len(all_mp3_files)} MP3 files in directory")
+            mp3_files = all_mp3_files
                 
         # Report files in metadata but not found in directory
         missing_files = []
-        for filename in valid_filenames:
-            file_path = audio_path / filename
-            if not file_path.exists():
-                missing_files.append(filename)
+        for metadata_filename in valid_filenames:
+            if metadata_filename not in sanitized_to_file:
+                missing_files.append(metadata_filename)
         
         if missing_files:
             print(f"\nWARNING: {len(missing_files)} files listed in metadata were not found in the audio directory:")

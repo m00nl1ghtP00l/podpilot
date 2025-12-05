@@ -1,0 +1,12 @@
+feedparser>=6.0.10
+requests>=2.31.0
+tqdm>=4.66.1
+mutagen>=1.47.0
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Optional LLM provider dependencies (install as needed)
+# For OpenAI: pip install openai
+# For Anthropic: pip install anthropic
+# For Ollama: no additional package needed (uses requests) 

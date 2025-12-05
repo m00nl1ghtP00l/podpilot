@@ -7,6 +7,7 @@ from mutagen.mp3 import MP3
 import subprocess
 import tempfile
 from datetime import datetime
+import argparse
 
 __all__ = ['transcode']
 
@@ -156,11 +157,29 @@ def transcode(input_path, target_size_mb=25, show_progress=True):
 
 def main():
     """Command line interface for the transcoder"""
-    if len(sys.argv) != 2:
-        print("Usage: python mp3_transcoder.py <mp3_file>")
+    parser = argparse.ArgumentParser(
+        description='Transcode MP3 files to target size by adjusting bitrate. '
+                    'Creates a backup (.orig) of the original file. '
+                    'Only transcodes if file exceeds target size. '
+                    'Bitrate range: 32-320 kbps.',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('input_file', help='Input MP3 file to transcode (REQUIRED)')
+    parser.add_argument('-s', '--size', type=int, default=25, 
+                        help='Target size in MB (default: 25). File is only transcoded if it exceeds this size.')
+    parser.add_argument('-q', '--quiet', action='store_true', 
+                        help='Quiet mode (no progress output)')
+    
+    # If run with no arguments, show usage and help.
+    if len(sys.argv) == 1:
+        parser.print_usage()
+        print()
+        parser.print_help()
         sys.exit(1)
     
-    input_path = Path(sys.argv[1])
+    args = parser.parse_args()
+    
+    input_path = Path(args.input_file)
     
     if not input_path.exists():
         print(f"Error: File {input_path} does not exist")
@@ -170,7 +189,7 @@ def main():
         print("Error: File must be an MP3")
         sys.exit(1)
     
-    result = transcode(input_path)
+    result = transcode(input_path, target_size_mb=args.size, show_progress=not args.quiet)
     if not result['success']:
         print(f"Error during transcoding: {result['error']}")
         sys.exit(1)

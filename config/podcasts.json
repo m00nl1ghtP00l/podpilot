@@ -1,7 +1,16 @@
 {
-  "youtube_url":"https://www.youtube.com/feeds/videos.xml",
+  "youtube_url": "https://www.youtube.com/feeds/videos.xml",
   "data_root": "/Users/eric/Documents/GitHub/podpilot-data",
-  "podcasts": [
+  "analysis": {
+    "provider": "ollama",
+    "model": "qwen2.5:14b"
+  },
+  "transcription": {
+    "provider": "whisper.cpp",
+    "model_path": "${WHISPER_MODEL_PATH}"
+  },
+  "min_duration": 300,
+  "youtube_channels": [
     {
       "channel_name_short": "hnh",
       "channel_name_long":"Haru no nihongo",
