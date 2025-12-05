@@ -476,7 +476,7 @@ class TestTranscribeAudio:
         base_path.stem = "test"
         mock_path.return_value = base_path
         
-        result = transcribe_audio(str(audio_file), mock_client)
+        result = transcribe_audio(str(audio_file), mock_client, language=None, prompt=None)
         assert result is True
         
         # Verify API was called

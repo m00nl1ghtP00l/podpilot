@@ -1,9 +1,11 @@
 {
+  "language": "ja",
   "youtube_url": "https://www.youtube.com/feeds/videos.xml",
   "data_root": "/path/to/your/data/directory",
   "analysis": {
     "provider": "ollama",
-    "model": "qwen2.5:14b"
+    "model": "qwen2.5:14b",
+    "base_url": "${OLLAMA_BASE_URL}"
   },
   "transcription": {
     "provider": "whisper.cpp",

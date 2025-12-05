@@ -17,6 +17,13 @@ import re
 from html import unescape
 import unicodedata
 
+# Import language adapter system
+try:
+    from adapters import get_language_adapter
+    ADAPTERS_AVAILABLE = True
+except ImportError:
+    ADAPTERS_AVAILABLE = False
+
 # Constants
 CHANNEL_ID_LENGTH = 24
 CHANNEL_ID_PREFIX = 'UC'
@@ -118,11 +125,26 @@ def sanitize_filename(filename: str) -> str:
     return filename.rstrip('_')
 
 
-def clean_title(title: str) -> str:
-    """Convert spaces and pipes to underscores while preserving Japanese characters."""
+def clean_title(title: str, language_code: Optional[str] = None) -> str:
+    """Convert spaces and pipes to underscores while preserving language-specific characters.
+    
+    Args:
+        title: Title to clean
+        language_code: Optional language code (defaults to 'ja' for backward compatibility)
+    
+    Returns:
+        Cleaned title suitable for use as filename
+    """
     if not title:
         return ""
     
+    # Try to use language adapter if available
+    if ADAPTERS_AVAILABLE and language_code:
+        adapter = get_language_adapter(language_code)
+        if adapter:
+            return adapter.clean_title(title)
+    
+    # Fallback to Japanese-specific cleaning (original behavior)
     # Extract Japanese segments
     jp_segments = _extract_japanese_segments(title)
     
@@ -254,7 +276,8 @@ def parse_rss_feed(
     from_date: Optional[datetime.date] = None,
     to_date: Optional[datetime.date] = None,
     include_author: bool = False,
-    include_description: bool = False
+    include_description: bool = False,
+    language_code: Optional[str] = None
 ) -> Dict[str, any]:
     """Parse the RSS feed XML content and extract video information."""
     try:
@@ -290,7 +313,7 @@ def parse_rss_feed(
                 
             # Get title and create clean filename
             raw_title = entry.find('./atom:title', namespaces).text
-            clean_title_str = clean_title(raw_title)
+            clean_title_str = clean_title(raw_title, language_code=language_code)
             
             # Create filename with date prefix
             date_str = published_date.strftime('%Y-%m-%d')
@@ -509,6 +532,11 @@ def main():
     else:
         parser.error("Either channel_id or --config with --name must be provided")
     
+    # Get language code from config if available
+    language_code = None
+    if config_data:
+        language_code = config_data.get('language', 'ja')  # Default to Japanese for backward compatibility
+    
     # Fetch and parse the RSS feed
     xml_content = fetch_rss_feed(channel_id)
     channel_info = parse_rss_feed(
@@ -516,7 +544,8 @@ def main():
         from_date=args.from_date, 
         to_date=args.to_date,
         include_author=args.include_author,
-        include_description=args.include_description
+        include_description=args.include_description,
+        language_code=language_code
     )
     
     # Sort videos if requested

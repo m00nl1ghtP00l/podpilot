@@ -88,15 +88,18 @@ class OllamaProvider(LLMProvider):
                     self.model = actual_model
                 return actual_model is not None
             return False
-        except requests.exceptions.RequestException:
+        except requests.exceptions.ConnectionError as e:
+            # More specific error for connection issues
+            return False
+        except requests.exceptions.RequestException as e:
             return False
     
     def generate(self, prompt: str, system_prompt: Optional[str] = None,
                  temperature: float = 0.7, max_tokens: Optional[int] = None,
                  format: Optional[str] = None) -> str:
         """Generate response using Ollama API"""
-        if not self.is_available():
-            raise RuntimeError(f"Ollama is not available or model '{self.model}' is not installed")
+        # Don't check is_available() here - it was already checked during initialization
+        # Just try the request and let it fail with a clear error if there's an issue
         
         # Build messages
         messages = []
@@ -122,10 +125,12 @@ class OllamaProvider(LLMProvider):
             payload["format"] = "json"
         
         try:
+            # Use longer timeout for generation - models can be slow with complex prompts
+            # Connection test already confirmed Ollama is reachable, so longer timeout is safe
             response = requests.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
-                timeout=300  # 5 minute timeout for long generations
+                timeout=600  # 10 minute timeout (generation can take time for complex lessons)
             )
             response.raise_for_status()
             result = response.json()

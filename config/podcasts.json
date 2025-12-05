@@ -3,7 +3,8 @@
   "data_root": "/Users/eric/Documents/GitHub/podpilot-data",
   "analysis": {
     "provider": "ollama",
-    "model": "qwen2.5:14b"
+    "model": "qwen2.5:14b",
+    "base_url": "http://localhost:11434"
   },
   "transcription": {
     "provider": "whisper.cpp",

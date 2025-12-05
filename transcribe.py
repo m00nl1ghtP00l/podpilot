@@ -9,13 +9,19 @@ from datetime import timezone
 import sys
 
 # Import functions from other modules
-from find_podcasts import clean_title, fetch_rss_feed, parse_rss_feed
+from find_podcasts import clean_title, fetch_rss_feed, parse_rss_feed, load_config
 from download_audio import download_file, process_existing_file
+
+# Import language adapter system
+try:
+    from adapters import get_language_adapter
+    ADAPTERS_AVAILABLE = True
+except ImportError:
+    ADAPTERS_AVAILABLE = False
 
 # Constants
 WHISPER_MODEL = "whisper-1"
-TRANSCRIPTION_LANGUAGE = "ja"
-TRANSCRIPTION_PROMPT = "この音声は日本語です。できるだけ正確に文字起こししてください。文末に改行を入れてください."
+DEFAULT_LANGUAGE = "ja"  # Default to Japanese for backward compatibility
 DEFAULT_FILE_HOUR = 12  # Default hour for file dates (noon UTC)
 YOUTUBE_VIDEO_ID_LENGTH = 11  # Standard YouTube video ID length
 
@@ -116,8 +122,28 @@ def check_existing_transcription(file_path):
     txt_exists = base_path.with_suffix('.txt').exists()
     return json_exists or txt_exists
 
-def transcribe_audio(file_path, client):
-    """Transcribe audio using OpenAI Whisper API"""
+def transcribe_audio(file_path, client, language=None, prompt=None):
+    """Transcribe audio using OpenAI Whisper API
+    
+    Args:
+        file_path: Path to audio file
+        client: OpenAI client instance
+        language: Language code (defaults to 'ja' for backward compatibility)
+        prompt: Transcription prompt (defaults to language-specific prompt if adapter available)
+    """
+    # Use defaults if not provided
+    if language is None:
+        language = DEFAULT_LANGUAGE
+    if prompt is None:
+        # Try to get prompt from language adapter
+        if ADAPTERS_AVAILABLE:
+            adapter = get_language_adapter(language)
+            if adapter:
+                prompt = adapter.get_transcription_prompt()
+        # Fallback to Japanese prompt if no adapter
+        if prompt is None:
+            prompt = "この音声は日本語です。できるだけ正確に文字起こししてください。文末に改行を入れてください."
+    
     try:
         print(f"Starting transcription of {os.path.basename(file_path)}...")
         with open(file_path, "rb") as audio_file:
@@ -125,8 +151,8 @@ def transcribe_audio(file_path, client):
                 model=WHISPER_MODEL,
                 file=audio_file,
                 response_format="verbose_json",
-                language=TRANSCRIPTION_LANGUAGE,
-                prompt=TRANSCRIPTION_PROMPT
+                language=language,
+                prompt=prompt
             )
             
             transcript_dict = transcript.model_dump()
@@ -365,7 +391,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
     
     return True
 
-def process_transcriptions(audio_dir, json_file, from_date, to_date, retranscribe=False, api_key=None, simulate=False):
+def process_transcriptions(audio_dir, json_file, from_date, to_date, retranscribe=False, api_key=None, simulate=False, language=None, prompt=None):
     """Process audio transcriptions"""
     print_substep("Processing transcriptions")
     
@@ -483,7 +509,7 @@ def process_transcriptions(audio_dir, json_file, from_date, to_date, retranscrib
     
     for audio_file, file_date in files_to_process:
         print(f"\nProcessing: {audio_file.name} (date: {file_date.date()})")
-        if transcribe_audio(str(audio_file), client):
+        if transcribe_audio(str(audio_file), client, language=language, prompt=prompt):
             success += 1
         else:
             failed += 1
@@ -536,6 +562,17 @@ def main():
     except ValueError as e:
         print(f"Error: {e}")
         return 1
+    
+    # Load language adapter from config
+    language = None
+    prompt = None
+    if ADAPTERS_AVAILABLE:
+        language_code = config.get('language', DEFAULT_LANGUAGE)
+        language = language_code
+        adapter = get_language_adapter(language_code)
+        if adapter:
+            prompt = adapter.get_transcription_prompt()
+            print(f"Using language adapter: {adapter.language_name} ({adapter.language_code})")
     
     # List podcasts if requested
     if args.list:
@@ -621,7 +658,9 @@ def main():
         args.to_date,
         args.retranscribe or args.force,
         args.api_key,
-        args.simulate
+        args.simulate,
+        language=language,
+        prompt=prompt
     )
     
     if not success:

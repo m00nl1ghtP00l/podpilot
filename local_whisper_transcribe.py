@@ -12,6 +12,13 @@ from datetime import timezone
 import shutil
 from find_podcasts import load_config, find_podcast_by_name, sanitize_filename
 
+# Import language adapter system
+try:
+    from adapters import get_language_adapter
+    ADAPTERS_AVAILABLE = True
+except ImportError:
+    ADAPTERS_AVAILABLE = False
+
 def parse_date_arg(date_str):
     """Parse date argument from command line"""
     if not date_str:
@@ -232,16 +239,26 @@ def get_video_id_from_metadata(file_path):
         print(f"Error extracting video ID: {e}")
         return None
 
-def segment_japanese_text(text):
-    """Split Japanese text into sentences.
+def segment_text(text, language_code='ja'):
+    """Split text into sentences using language-specific rules.
     
-    Japanese sentences typically end with punctuation marks like 。, ？, or ！.
-    This function splits the text at these marks and ensures each sentence is on its own line.
+    Uses language adapter if available, otherwise falls back to Japanese rules.
+    
+    Args:
+        text: Text to segment
+        language_code: Language code (defaults to 'ja' for backward compatibility)
+    
+    Returns:
+        List of sentences
     """
-    # Define Japanese sentence-ending punctuation
-    end_marks = ['。', '？', '！', '…']
+    # Try to use language adapter
+    if ADAPTERS_AVAILABLE:
+        adapter = get_language_adapter(language_code)
+        if adapter:
+            return adapter.segment_text(text)
     
-    # Split the text into initial chunks based on line breaks
+    # Fallback to Japanese segmentation (original behavior)
+    end_marks = ['。', '？', '！', '…']
     chunks = text.split('\n')
     sentences = []
     
@@ -249,27 +266,27 @@ def segment_japanese_text(text):
         if not chunk.strip():
             continue
             
-        # Current position in the chunk
         current_pos = 0
         chunk_len = len(chunk)
         
-        # Process the chunk character by character
         for i in range(chunk_len):
-            # Check if this character is a sentence-ending punctuation
             if i < chunk_len and chunk[i] in end_marks:
-                # Extract the sentence (including the ending punctuation)
                 sentence = chunk[current_pos:i+1].strip()
                 if sentence:
                     sentences.append(sentence)
                 current_pos = i + 1
         
-        # Add any remaining text as a sentence
         if current_pos < chunk_len:
             remaining = chunk[current_pos:].strip()
             if remaining:
                 sentences.append(remaining)
     
     return sentences
+
+# Keep old function name for backward compatibility
+def segment_japanese_text(text):
+    """Deprecated: Use segment_text() instead. Kept for backward compatibility."""
+    return segment_text(text, 'ja')
 
 
 def load_metadata(metadata_file):

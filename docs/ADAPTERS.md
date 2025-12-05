@@ -36,10 +36,42 @@ class SpanishAdapter(LanguageAdapter):
         return "Este audio está en español. Por favor transcríbelo con la mayor precisión posible."
     
     def get_lesson_system_prompt(self) -> str:
-        return """You are an expert Spanish language teacher..."""
+        return """# Role
+You are an expert Spanish language teacher specializing in CEFR preparation.
+
+# Task
+Analyze Spanish text and create structured lessons with vocabulary and grammar explanations.
+
+# Output Format
+Always respond in **valid JSON format only** (no markdown code blocks, no explanatory text). Use the following structure:
+
+```json
+{
+  "vocabulary": [...],
+  "grammar_points": [...],
+  "key_phrases": [...],
+  "summary": "..."
+}
+```
+
+# Instructions
+- Extract important vocabulary with meanings and CEFR levels
+- Identify grammar patterns with clear explanations
+- Include key phrases with context
+- Provide a brief summary
+- Ensure all JSON is valid and properly formatted"""
     
     def get_lesson_user_prompt_template(self) -> str:
-        return """Analyze the following Spanish text..."""
+        return """# Analysis Request
+
+{episode_title_section}
+
+## Spanish Text to Analyze
+
+{transcription_text}
+
+## Task
+Create a comprehensive lesson by extracting vocabulary, grammar, key phrases, and a summary."""
     
     def segment_text(self, text: str) -> List[str]:
         # Split Spanish text into sentences
@@ -149,15 +181,24 @@ The `language` field determines which adapter to use for:
 
 ## Best Practices
 
-1. **Preserve special characters**: When cleaning titles, preserve language-specific characters (e.g., Japanese Kanji, Spanish accents)
+1. **Use Markdown for prompts**: Format your system and user prompts using markdown for better readability:
+   - Use `#` for main sections (Role, Task, Output Format, Instructions)
+   - Use `##` for subsections
+   - Use `**bold**` for emphasis
+   - Use code blocks with ` ```json ` for JSON schema examples
+   - Keep prompts clear and well-structured
 
-2. **Use standard language codes**: Use ISO 639-1 codes (e.g., 'ja', 'en', 'es', 'fr')
+2. **Preserve special characters**: When cleaning titles, preserve language-specific characters (e.g., Japanese Kanji, Spanish accents)
 
-3. **Follow existing patterns**: Look at `adapters/japanese.py` for a complete reference implementation
+3. **Use standard language codes**: Use ISO 639-1 codes (e.g., 'ja', 'en', 'es', 'fr')
 
-4. **Test your adapter**: Create tests in `tests/test_adapters.py` following the pattern of existing tests
+4. **Follow existing patterns**: Look at `adapters/japanese.py` for a complete reference implementation with markdown-formatted prompts
 
-5. **Document proficiency levels**: Clearly document what each proficiency level means for your language
+5. **Test your adapter**: Create tests in `tests/test_adapters.py` following the pattern of existing tests
+
+6. **Document proficiency levels**: Clearly document what each proficiency level means for your language
+
+7. **JSON output format**: Always request JSON output in your prompts, but format the prompt itself in markdown for clarity
 
 ## Contributing Adapters
 

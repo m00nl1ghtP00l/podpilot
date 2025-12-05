@@ -59,7 +59,7 @@ Tests are organized by the function/class they test. Test files include:
 - `test_podcast_downloader.py` - Tests for RSS podcast downloader
 - `test_update_durations.py` - Tests for duration metadata updates
 - `test_generate_lesson.py` - Tests for lesson generation
-- `test_process_lessons.py` - Tests for batch lesson processing
+- `test_process_lessons.py` - Tests for batch lesson processing (now part of generate_lesson.py)
 - `test_llm_providers.py` - Tests for LLM provider implementations
 
 ## Writing New Tests

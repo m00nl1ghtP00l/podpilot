@@ -1,13 +1,12 @@
 """
-Tests for process_lessons.py
+Tests for batch processing features in generate_lesson.py
 
 This test suite covers:
 - Finding transcription files
 - Extracting dates from filenames
 - Calculating worker count
-- Processing single files
+- Processing single files (parallel mode)
 - Batch processing
-- CLI interface
 """
 
 import pytest
@@ -20,11 +19,11 @@ import sys
 # Add parent directory to path to import the module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from process_lessons import (
+from generate_lesson import (
     find_transcription_files,
     get_file_date_from_name,
     calculate_worker_count,
-    process_single_file,
+    process_single_file_for_parallel,
     main
 )
 
@@ -95,7 +94,7 @@ class TestGetFileDateFromName:
 class TestCalculateWorkerCount:
     """Tests for calculate_worker_count function"""
     
-    @patch('process_lessons.multiprocessing.cpu_count')
+    @patch('generate_lesson.multiprocessing.cpu_count')
     def test_calculate_worker_count_auto(self, mock_cpu_count):
         """Test auto worker count calculation"""
         mock_cpu_count.return_value = 8
@@ -106,7 +105,7 @@ class TestCalculateWorkerCount:
         assert result >= 1
         assert result <= 8
     
-    @patch('process_lessons.multiprocessing.cpu_count')
+    @patch('generate_lesson.multiprocessing.cpu_count')
     def test_calculate_worker_count_specified(self, mock_cpu_count):
         """Test specified worker count"""
         mock_cpu_count.return_value = 8
@@ -115,7 +114,7 @@ class TestCalculateWorkerCount:
         
         assert result == 4
     
-    @patch('process_lessons.multiprocessing.cpu_count')
+    @patch('generate_lesson.multiprocessing.cpu_count')
     def test_calculate_worker_count_capped(self, mock_cpu_count):
         """Test worker count is capped at CPU count"""
         mock_cpu_count.return_value = 4
@@ -124,7 +123,7 @@ class TestCalculateWorkerCount:
         
         assert result == 4
     
-    @patch('process_lessons.multiprocessing.cpu_count')
+    @patch('generate_lesson.multiprocessing.cpu_count')
     def test_calculate_worker_count_minimum(self, mock_cpu_count):
         """Test worker count has minimum of 1"""
         mock_cpu_count.return_value = 1
@@ -137,10 +136,10 @@ class TestCalculateWorkerCount:
 class TestProcessSingleFile:
     """Tests for process_single_file function"""
     
-    @patch('process_lessons.get_provider')
-    @patch('process_lessons.load_transcription')
-    @patch('process_lessons.generate_lesson')
-    @patch('process_lessons.save_lesson')
+    @patch('generate_lesson.get_provider')
+    @patch('generate_lesson.load_transcription')
+    @patch('generate_lesson.generate_lesson')
+    @patch('generate_lesson.save_lesson')
     def test_process_single_file_success(self, mock_save, mock_generate, mock_load, mock_get_provider, tmp_path):
         """Test successful processing of single file"""
         txt_file = tmp_path / "2024-01-15_transcript.txt"
@@ -151,7 +150,7 @@ class TestProcessSingleFile:
         mock_load.return_value = "Test transcription"
         mock_generate.return_value = {"vocabulary": [], "summary": "Test"}
         
-        result = process_single_file(txt_file, "ollama", {"model": "test"}, "json")
+        result = process_single_file_for_parallel(txt_file, "ollama", {"model": "test"}, "json")
         
         assert result[0] == txt_file
         assert result[1] is True
@@ -169,7 +168,7 @@ class TestProcessSingleFile:
         mock_get_provider.return_value = mock_provider
         mock_load.return_value = ""
         
-        result = process_single_file(txt_file, "ollama", {"model": "test"}, "json")
+        result = process_single_file_for_parallel(txt_file, "ollama", {"model": "test"}, "json")
         
         assert result[0] == txt_file
         assert result[1] is False
@@ -185,7 +184,7 @@ class TestProcessSingleFile:
         mock_get_provider.return_value = mock_provider
         mock_load.side_effect = Exception("Test error")
         
-        result = process_single_file(txt_file, "ollama", {"model": "test"}, "json")
+        result = process_single_file_for_parallel(txt_file, "ollama", {"model": "test"}, "json")
         
         assert result[0] == txt_file
         assert result[1] is False

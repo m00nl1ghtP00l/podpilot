@@ -182,21 +182,33 @@ python local_whisper_transcribe.py -a /Users/eric/Documents/GitHub/podpilot-data
 
 **Single file:**
 ```bash
-python generate_lesson.py <transcription_file> [--name PODCAST_NAME] [--format json|markdown]
+python generate_lesson.py <transcription_file> [options]
 ```
 
-**Batch processing:**
+**Batch processing (all files for a podcast):**
 ```bash
-python process_lessons.py -a <audio_dir> [--name PODCAST_NAME] [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
+python generate_lesson.py --name PODCAST_NAME [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD] [options]
 ```
 
 Examples:
 ```bash
 # Generate lesson from single transcription
-python generate_lesson.py transcript.txt --name hnh --format markdown
+python generate_lesson.py transcript.txt --name hnh
 
-# Batch process all transcriptions
-python process_lessons.py -a /path/to/audio --name hnh --from-date 2024-01-01
+# Process all transcriptions for a podcast
+python generate_lesson.py --name hnh
+
+# Process with date filter
+python generate_lesson.py --name hnh --from-date 2024-01-01 --to-date 2024-01-31
+
+# Parallel processing (Ollama only)
+python generate_lesson.py --name hnh -j 4
+
+# Simulation mode (see what would be processed)
+python generate_lesson.py --name hnh --simulate
+
+# Skip existing lessons
+python generate_lesson.py --name hnh --skip-existing
 ```
 
 ### Update Duration Metadata
@@ -218,7 +230,6 @@ podpilot/
 ├── mp3_transcoder.py             # Transcode audio files to target size
 ├── update_durations.py           # Update metadata with duration info
 ├── generate_lesson.py            # Generate JLPT lessons from transcriptions
-├── process_lessons.py            # Batch process transcriptions into lessons
 ├── llm_providers.py              # LLM provider implementations (Ollama, OpenAI, Anthropic)
 ├── llm_config.py                 # LLM configuration defaults
 ├── podcast_downloader.py        # Alternative downloader implementation

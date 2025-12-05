@@ -12,7 +12,8 @@ Example
 {
   "analysis": {
     "provider": "ollama",
-    "model": "qwen2.5:14b"
+    "model": "qwen2.5:14b",
+    "base_url": "${OLLAMA_BASE_URL}"
   },
   "transcription": {
     "provider": "whisper.cpp",
@@ -26,11 +27,12 @@ Switching providers
 -------------------
 - analysis.provider: ollama | openai | anthropic
   - model: e.g., qwen2.5:14b (ollama), gpt-4o (openai), claude-3.5-sonnet (anthropic)
+  - base_url: Ollama server URL (supports env vars: ${OLLAMA_BASE_URL} or $OLLAMA_BASE_URL, default: http://localhost:11434)
 - transcription.provider: whisper.cpp | openai
   - whisper.cpp: set model_path (supports env vars: ${WHISPER_MODEL_PATH} or $WHISPER_MODEL_PATH)
   - openai: set openai_model (e.g., whisper-1); requires OPENAI_API_KEY
 
 Precedence
 ----------
-Config is the source of truth. CLI/env can override if you choose to keep them, but the recommended path is to set providers/models here.***
+Config is the source of truth. CLI/env can override if you choose to keep them, but the recommended path is to set providers/models here.
 
