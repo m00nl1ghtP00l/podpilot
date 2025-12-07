@@ -11,7 +11,7 @@ Provides Japanese-specific:
 """
 
 import re
-from typing import List
+from typing import List, Optional, Dict
 from .base import LanguageAdapter
 
 
@@ -34,45 +34,25 @@ class JapaneseAdapter(LanguageAdapter):
     def get_transcription_prompt(self) -> str:
         return "この音声は日本語です。できるだけ正確に文字起こししてください。文末に改行を入れてください."
     
-    def get_lesson_system_prompt(self) -> str:
-        schema_block = self.format_schema_for_prompt()
-        return f"""# Role
-You are an expert Japanese language teacher specializing in JLPT (Japanese Language Proficiency Test) preparation.
-
-# Task
-Analyze Japanese text and create structured lessons with vocabulary and grammar explanations.
-
-# Output Format
-Always respond in **valid JSON format only** (no markdown code blocks, no explanatory text). Use the following structure:
-
-{schema_block}
-
-# Instructions
-- Extract important vocabulary words with their readings, meanings, and JLPT levels
-- Identify grammar patterns and structures with clear explanations
-- Include key phrases that are useful for learners
-- Provide a brief summary of the content
-- Focus on words and grammar useful for JLPT learners (N5-N1 levels)
-- Ensure all JSON is valid and properly formatted"""
+    def get_lesson_system_prompt(self, variant: Optional[str] = None, prompt_files: Optional[Dict] = None) -> str:
+        """Get system prompt from file, with schema injection for Japanese"""
+        from pathlib import Path
+        from typing import Dict
+        
+        # Get prompt (from config files, variant, or default)
+        prompt = super().get_lesson_system_prompt(variant=variant, prompt_files=prompt_files)
+        
+        # Inject schema if {schema_block} placeholder exists
+        if "{schema_block}" in prompt:
+            schema_block = self.format_schema_for_prompt()
+            prompt = prompt.replace("{schema_block}", schema_block)
+        
+        return prompt
     
-    def get_lesson_user_prompt_template(self) -> str:
-        return """# Analysis Request
-
-{episode_title_section}
-
-## Japanese Text to Analyze
-
-{transcription_text}
-
-## Task
-Create a comprehensive JLPT-style lesson by extracting:
-
-1. **Vocabulary**: Important words with readings, meanings, and JLPT levels
-2. **Grammar**: Patterns and structures with explanations
-3. **Key Phrases**: Useful phrases with context
-4. **Summary**: Brief overview of the content
-
-Focus on content useful for JLPT learners (N5-N1 levels)."""
+    def get_lesson_user_prompt_template(self, variant: Optional[str] = None, prompt_files: Optional[Dict] = None) -> str:
+        """Get user prompt template from file"""
+        # Just use base class implementation (handles config files and variants)
+        return super().get_lesson_user_prompt_template(variant=variant, prompt_files=prompt_files)
     
     def segment_text(self, text: str) -> List[str]:
         """Split Japanese text into sentences.

@@ -151,7 +151,9 @@ def load_transcription(transcription_path: Path) -> str:
 
 def generate_lesson(provider: LLMProvider, transcription_text: str, 
                    episode_title: Optional[str] = None,
-                   language_adapter: Optional[LanguageAdapter] = None) -> Dict:
+                   language_adapter: Optional[LanguageAdapter] = None,
+                   prompt_variant: Optional[str] = None,
+                   prompt_files: Optional[Dict] = None) -> Dict:
     """Generate a lesson from transcription text
     
     Args:
@@ -171,9 +173,9 @@ def generate_lesson(provider: LLMProvider, transcription_text: str,
         else:
             language_adapter = FallbackAdapter()
     
-    # Get prompts from adapter
-    system_prompt = language_adapter.get_lesson_system_prompt()
-    user_prompt_template = language_adapter.get_lesson_user_prompt_template()
+    # Get prompts from adapter (with optional variant and config files)
+    system_prompt = language_adapter.get_lesson_system_prompt(variant=prompt_variant, prompt_files=prompt_files)
+    user_prompt_template = language_adapter.get_lesson_user_prompt_template(variant=prompt_variant, prompt_files=prompt_files)
     
     # Format user prompt
     episode_title_section = f"Episode Title: {episode_title}\n\n" if episode_title else ""
@@ -194,33 +196,28 @@ def generate_lesson(provider: LLMProvider, transcription_text: str,
             prompt=prompt,
             system_prompt=system_prompt,
             temperature=0.3,  # Lower temperature for more consistent, educational output
-            format="json_object" if use_json_format else None
+            format=None  # No format enforcement - let LLM generate markdown naturally
         )
         
-        # Try to parse JSON response
-        # Sometimes LLMs wrap JSON in markdown code blocks
-        response = response.strip()
-        if response.startswith('```'):
-            # Extract JSON from markdown code block
-            lines = response.split('\n')
-            json_lines = []
-            in_json = False
+        # LLM returns markdown directly - just clean it up and return
+        markdown_content = response.strip()
+        
+        # Remove any markdown code block wrappers if present
+        if markdown_content.startswith('```'):
+            # Extract content from markdown code block
+            lines = markdown_content.split('\n')
+            content_lines = []
+            in_code_block = False
             for line in lines:
                 if line.strip().startswith('```'):
-                    in_json = not in_json
+                    in_code_block = not in_code_block
                     continue
-                if in_json:
-                    json_lines.append(line)
-            response = '\n'.join(json_lines)
-        elif response.startswith('```json'):
-            response = response.replace('```json', '').replace('```', '').strip()
+                if not in_code_block:
+                    content_lines.append(line)
+            markdown_content = '\n'.join(content_lines).strip()
         
-        lesson_data = json.loads(response)
-        return lesson_data
-    except json.JSONDecodeError as e:
-        print(f"Error: LLM response was not valid JSON")
-        print(f"Response: {response[:500]}...")
-        raise RuntimeError(f"Failed to parse lesson JSON: {e}")
+        # Return as a simple dict with markdown content
+        return {"markdown": markdown_content}
     except Exception as e:
         # Don't wrap RuntimeError from provider - it already has good error messages
         if isinstance(e, RuntimeError) and ("Ollama" in str(e) or "OpenAI" in str(e) or "Anthropic" in str(e)):
@@ -237,8 +234,13 @@ def save_lesson(lesson_data: Dict, output_path: Path, format: str = "markdown", 
             json.dump(lesson_data, f, ensure_ascii=False, indent=2)
         print(f"✓ Lesson saved to {output_path}")
     elif format == "markdown":
-        # Convert to markdown format
-        md_content = format_lesson_markdown(lesson_data, language_adapter)
+        # LLM already returns markdown, just save it directly
+        if "markdown" in lesson_data:
+            md_content = lesson_data["markdown"]
+        else:
+            # Fallback: convert old JSON format to markdown (backward compatibility)
+            md_content = format_lesson_markdown(lesson_data, language_adapter)
+        
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(md_content)
         print(f"✓ Lesson saved to {output_path}")
@@ -329,10 +331,16 @@ def get_file_date_from_name(filename: str):
 
 
 def find_transcription_files(audio_dir: Path, from_date=None, to_date=None):
-    """Find transcription files in a directory"""
-    transcription_files = []
+    """Find transcription files in a directory
     
-    # Look for .txt files (transcriptions)
+    Prefers clean transcript files (_transcript.txt) over formatted ones (.txt).
+    If both exist, only processes the clean version.
+    """
+    transcription_files = []
+    seen_basenames = set()
+    
+    # First pass: collect all .txt files
+    all_txt_files = []
     for txt_file in audio_dir.glob("*.txt"):
         # Skip lesson files
         if "_lesson" in txt_file.stem:
@@ -347,7 +355,27 @@ def find_transcription_files(audio_dir: Path, from_date=None, to_date=None):
                 if to_date and file_date > to_date:
                     continue
         
-        transcription_files.append(txt_file)
+        all_txt_files.append(txt_file)
+    
+    # Second pass: prefer _transcript.txt files over regular .txt files
+    # (local_whisper_transcribe.py creates both: formatted .txt and clean _transcript.txt)
+    for txt_file in sorted(all_txt_files):
+        base_name = txt_file.stem
+        
+        # If this is a _transcript.txt file, use it
+        if base_name.endswith("_transcript"):
+            clean_base = base_name.replace("_transcript", "")
+            seen_basenames.add(clean_base)
+            transcription_files.append(txt_file)
+        # If this is a regular .txt file, check if _transcript.txt exists
+        elif base_name not in seen_basenames:
+            # Check if corresponding _transcript.txt exists
+            transcript_version = txt_file.parent / f"{base_name}_transcript.txt"
+            if not transcript_version.exists():
+                # No clean version exists, use the formatted one
+                transcription_files.append(txt_file)
+                seen_basenames.add(base_name)
+            # If _transcript.txt exists, skip this formatted version (will be picked up in first pass)
     
     return sorted(transcription_files)
 
@@ -369,7 +397,7 @@ def calculate_worker_count(requested_jobs: int, max_utilization: float) -> int:
 
 
 def process_single_file_for_parallel(txt_file: Path, provider_type: str, provider_kwargs: dict,
-                                     output_format: str, language_adapter=None):
+                                     output_format: str, language_adapter=None, prompt_variant=None, prompt_files=None):
     """Process a single transcription file (for parallel execution)"""
     try:
         # Create a new provider instance for this thread (important for Ollama)
@@ -389,7 +417,9 @@ def process_single_file_for_parallel(txt_file: Path, provider_type: str, provide
         output_path = txt_file.parent / f"{txt_file.stem}_lesson.{ext}"
         lesson_data = generate_lesson(provider, transcription_text, 
                                      episode_title=episode_title,
-                                     language_adapter=language_adapter)
+                                     language_adapter=language_adapter,
+                                     prompt_variant=prompt_variant,
+                                     prompt_files=prompt_files)
         
         # Save lesson
         save_lesson(lesson_data, output_path, output_format, language_adapter)
@@ -426,6 +456,8 @@ def main():
                        help='Short name of the podcast from config file (loads LLM settings from config)')
     parser.add_argument('--language',
                        help='Language code (e.g., ja, en, es). Overrides config language setting.')
+    parser.add_argument('--prompt-variant',
+                       help='Prompt variant name (e.g., detailed, simple). Looks for system_prompt_{variant}.md files.')
     parser.add_argument('--from-date',
                        help='Start date filter (YYYY-MM-DD). Only process files from this date onwards.')
     parser.add_argument('--to-date',
@@ -467,6 +499,7 @@ def main():
             config_ollama_url = None
         
         # Load language adapter from config or command line
+        prompt_variant = None
         if ADAPTERS_AVAILABLE:
             language_code = args.language or config_data.get('language', 'ja')  # Default to Japanese for backward compatibility
             language_adapter = get_language_adapter(language_code)
@@ -474,6 +507,24 @@ def main():
                 print(f"Using language adapter: {language_adapter.language_name} ({language_adapter.language_code})")
             else:
                 print(f"Warning: Language adapter for '{language_code}' not found, using default")
+            
+            # Get prompt variant from CLI or config
+            prompt_variant = args.prompt_variant or analysis_cfg.get('prompt_variant')
+            if prompt_variant:
+                print(f"Using prompt variant: {prompt_variant}")
+            
+            # Get prompt_files from config (takes precedence over variant)
+            prompt_files = analysis_cfg.get('prompt_files')
+            if prompt_files:
+                print(f"Using prompt files from config:")
+                if "system" in prompt_files:
+                    print(f"  System: {prompt_files['system']}")
+                if "user" in prompt_files:
+                    print(f"  User: {prompt_files['user']}")
+            else:
+                prompt_files = None
+        else:
+            prompt_files = None
         
         # If --name was provided, validate it exists
         if args.name:
@@ -700,7 +751,9 @@ def main():
                     provider_type,
                     provider_kwargs,
                     args.format,
-                    language_adapter
+                    language_adapter,
+                    prompt_variant,
+                    prompt_files
                 ): txt_file for txt_file in transcription_files
             }
             
@@ -807,7 +860,9 @@ def main():
             try:
                 lesson_data = generate_lesson(provider, transcription_text, 
                                              episode_title=episode_title,
-                                             language_adapter=language_adapter)
+                                             language_adapter=language_adapter,
+                                             prompt_variant=prompt_variant,
+                                             prompt_files=prompt_files)
             except Exception as e:
                 error_msg = str(e)
                 # Check for timeout errors - exit immediately

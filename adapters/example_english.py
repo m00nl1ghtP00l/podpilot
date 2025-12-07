@@ -6,7 +6,7 @@ This serves as a template for creating custom language adapters.
 Users can copy this file and modify it for their target language.
 """
 
-from typing import List
+from typing import List, Optional, Dict
 from .base import LanguageAdapter
 
 
@@ -24,45 +24,22 @@ class EnglishAdapter(LanguageAdapter):
     def get_transcription_prompt(self) -> str:
         return "This audio is in English. Please transcribe it as accurately as possible. Add line breaks at the end of sentences."
     
-    def get_lesson_system_prompt(self) -> str:
-        schema_block = self.format_schema_for_prompt()
-        return f"""# Role
-You are an expert English language teacher specializing in ESL (English as a Second Language) preparation.
-
-# Task
-Analyze English text and create structured lessons with vocabulary and grammar explanations.
-
-# Output Format
-Always respond in **valid JSON format only** (no markdown code blocks, no explanatory text). Use the following structure:
-
-{schema_block}
-
-# Instructions
-- Extract important vocabulary words with pronunciations, meanings, and CEFR levels
-- Identify grammar patterns and structures with clear explanations
-- Include key phrases that are useful for learners
-- Provide a brief summary of the content
-- Focus on words and grammar useful for ESL learners (A1-C2 levels)
-- Ensure all JSON is valid and properly formatted"""
+    def get_lesson_system_prompt(self, variant: Optional[str] = None, prompt_files: Optional[Dict] = None) -> str:
+        """Get system prompt from file, with schema injection for English"""
+        # Get prompt (from config files, variant, or default)
+        prompt = super().get_lesson_system_prompt(variant=variant, prompt_files=prompt_files)
+        
+        # Inject schema if {schema_block} placeholder exists
+        if "{schema_block}" in prompt:
+            schema_block = self.format_schema_for_prompt()
+            prompt = prompt.replace("{schema_block}", schema_block)
+        
+        return prompt
     
-    def get_lesson_user_prompt_template(self) -> str:
-        return """# Analysis Request
-
-{episode_title_section}
-
-## English Text to Analyze
-
-{transcription_text}
-
-## Task
-Create a comprehensive ESL-style lesson by extracting:
-
-1. **Vocabulary**: Important words with pronunciations, meanings, and CEFR levels
-2. **Grammar**: Patterns and structures with explanations
-3. **Key Phrases**: Useful phrases with context
-4. **Summary**: Brief overview of the content
-
-Focus on content useful for ESL learners (A1-C2 levels)."""
+    def get_lesson_user_prompt_template(self, variant: Optional[str] = None, prompt_files: Optional[Dict] = None) -> str:
+        """Get user prompt template from file"""
+        # Just use base class implementation (handles config files and variants)
+        return super().get_lesson_user_prompt_template(variant=variant, prompt_files=prompt_files)
     
     def segment_text(self, text: str) -> List[str]:
         """Split English text into sentences.
