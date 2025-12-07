@@ -19,7 +19,6 @@ Podpilot automates the process of:
 - 🔄 **Dual Transcription** - Support for both OpenAI Whisper API and local whisper.cpp
 - 📦 **Smart Transcoding** - Automatically reduces file size to meet API limits
 - 🎨 **Japanese Character Handling** - Properly handles Japanese characters in filenames
-- ✅ **Resume Support** - Can resume interrupted downloads
 - 📊 **Progress Tracking** - Visual progress bars for downloads
 - 🤖 **LLM Integration** - Generate JLPT-style lessons from transcriptions (Ollama, OpenAI, Anthropic)
 - ⏱️ **Duration Management** - Automatic duration extraction and metadata updates
