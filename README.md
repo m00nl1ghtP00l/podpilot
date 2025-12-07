@@ -1,6 +1,6 @@
 # Podpilot
 
-A Python pipeline for downloading, processing, and transcribing Japanese language learning podcasts from YouTube.
+A Python pipeline for downloading, processing, transcribing, and transforming foreign language podcasts from YouTube into new educational content.
 
 ## Overview
 
@@ -16,7 +16,7 @@ Podpilot automates the process of:
 
 - 🎯 **Japanese Language Focus** - Optimized for Japanese podcast transcription
 - 📅 **Date Range Filtering** - Download/transcribe episodes from specific date ranges
-- 🔄 **Dual Transcription** - Support for both OpenAI Whisper API and local Whisper CLI
+- 🔄 **Dual Transcription** - Support for both OpenAI Whisper API and local whisper.cpp
 - 📦 **Smart Transcoding** - Automatically reduces file size to meet API limits
 - 🎨 **Japanese Character Handling** - Properly handles Japanese characters in filenames
 - ✅ **Resume Support** - Can resume interrupted downloads
@@ -88,7 +88,7 @@ For example, if `data_root` is `/Users/eric/Documents/GitHub/podpilot-data` and 
 - **Transcriptions**: `/Users/eric/Documents/GitHub/podpilot-data/hnh/`
   - `.json` files (structured transcription data)
   - `.txt` files (plain text transcriptions)
-  - `.srt` files (subtitle format, if using local Whisper)
+  - `.srt` files (subtitle format, if using whisper.cpp)
 
 ### Where Files Are Downloaded
 
@@ -112,9 +112,10 @@ The location depends on which script you use:
 **For OpenAI Whisper API:**
 - Set your OpenAI API key: `export OPENAI_API_KEY=your_key_here`
 
-**For Local Whisper CLI:**
-- Install whisper-cli: `pip install openai-whisper` or use your preferred installation method
-- Ensure `whisper-cli` is in your PATH
+**For Local Whisper (whisper.cpp):**
+- Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) following the [installation instructions](https://github.com/ggerganov/whisper.cpp#usage) on the GitHub repository
+- Download a model file (e.g., `ggml-base.bin` or `ggml-large-v3.bin`) and set the path in your config
+- Ensure the `whisper-cli` executable is in your PATH, or specify the full path in your config's `transcription.executable` field
 
 ## Usage
 
@@ -162,7 +163,7 @@ python download_audio.py --name hnh -a /custom/path --from-date 2024-01-01
 python transcribe.py --name <podcast_name> [--config CONFIG] [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
 ```
 
-**Using Local Whisper CLI:**
+**Using Local Whisper (whisper.cpp):**
 ```bash
 python local_whisper_transcribe.py -a <audio_dir> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
 ```
@@ -172,11 +173,11 @@ Examples:
 # Transcribe using OpenAI API (uses data_root/podcast_name from config)
 python transcribe.py --name hnh --from-date 2024-01-01
 
-# Transcribe using local Whisper CLI
+# Transcribe using local whisper.cpp
 python local_whisper_transcribe.py -a /Users/eric/Documents/GitHub/podpilot-data/hnh --from-date 2024-01-01
 ```
 
-**Note:** `transcribe.py` automatically uses `{data_root}/{channel_name}` from your config file. `local_whisper_transcribe.py` requires you to specify the audio directory with `-a/--audio-dir`.
+**Note:** `transcribe.py` automatically uses `{data_root}/{channel_name}` from your config file. `local_whisper_transcribe.py` requires you to specify the audio directory with `-a/--audio-dir`. Make sure you have [whisper.cpp](https://github.com/ggerganov/whisper.cpp) installed and configured.
 
 ### Generate Lessons from Transcriptions
 
@@ -226,7 +227,7 @@ podpilot/
 ├── find_podcasts.py              # Find episodes from YouTube RSS feeds
 ├── download_audio.py             # Download audio from YouTube
 ├── transcribe.py                 # Transcribe using OpenAI Whisper API
-├── local_whisper_transcribe.py   # Transcribe using local Whisper CLI
+├── local_whisper_transcribe.py   # Transcribe using local whisper.cpp
 ├── mp3_transcoder.py             # Transcode audio files to target size
 ├── update_durations.py           # Update metadata with duration info
 ├── generate_lesson.py            # Generate JLPT lessons from transcriptions
@@ -276,14 +277,40 @@ See `TESTING.md` and `tests/README.md` for more information.
 - ffmpeg (for audio transcoding)
 - yt-dlp (for YouTube downloads)
 - OpenAI API key (optional, for cloud transcription or lesson generation)
-- whisper-cli (optional, for local transcription)
-- Ollama (optional, for local lesson generation)
+- whisper.cpp (optional, for local transcription) - see [installation instructions](https://github.com/ggerganov/whisper.cpp#usage)
+- Ollama (optional, for local LLM tasks like summarisation, analysis, or turning the text into a personalised learning experience)
 - Anthropic API key (optional, for Claude-based lesson generation)
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-[Add contribution guidelines here]
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Add tests if applicable
+5. Ensure all tests pass (`pytest`)
+6. Commit your changes (`git commit -m 'Add some amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+### Reporting Issues
+
+If you find a bug or have a feature request, please open an issue on GitHub with:
+- A clear description of the problem or feature
+- Steps to reproduce (for bugs)
+- Expected vs actual behavior
+- Your environment (OS, Python version, etc.)
+
+### Code Style
+
+- Follow PEP 8 style guidelines
+- Use type hints where appropriate
+- Add docstrings to functions and classes
+- Keep functions focused and modular

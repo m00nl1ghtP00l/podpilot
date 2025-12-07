@@ -184,11 +184,11 @@ def generate_lesson(provider: LLMProvider, transcription_text: str,
     
     try:
         # Determine format based on provider type
+        # For OpenAI/Anthropic: enforce JSON format via API (they support it well)
+        # For Ollama: rely on prompt instructions only (more flexible, matches UI behavior)
         use_json_format = isinstance(provider, (OpenAIProvider, AnthropicProvider))
-        if isinstance(provider, OllamaProvider):
-            # Ollama supports JSON format, but some models may hang with strict JSON enforcement
-            # Try without format first, then parse JSON from response if needed
-            use_json_format = False  # Let Ollama generate naturally, parse JSON from text
+        # Don't enforce JSON format for Ollama - let it generate naturally per prompt
+        # This matches behavior when pasting directly into Ollama UI
         
         response = provider.generate(
             prompt=prompt,
