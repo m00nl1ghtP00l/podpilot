@@ -15,23 +15,23 @@ Podpilot automates the process of:
 ## Features
 
 - 🎯 **Japanese Language Focus** - Optimized for Japanese podcast transcription
+- 🎨 **Japanese Character Handling** - Properly handles Japanese characters in filenames
+- 🤖 **LLM Integration** - Generate JLPT-style lessons from transcriptions (Ollama, OpenAI, Anthropic)
 - 📅 **Date Range Filtering** - Download/transcribe episodes from specific date ranges
 - 🔄 **Dual Transcription** - Support for both OpenAI Whisper API and local whisper.cpp
 - 📦 **Smart Transcoding** - Automatically reduces file size to meet API limits
-- 🎨 **Japanese Character Handling** - Properly handles Japanese characters in filenames
 - 📊 **Progress Tracking** - Visual progress bars for downloads
-- 🤖 **LLM Integration** - Generate JLPT-style lessons from transcriptions (Ollama, OpenAI, Anthropic)
 - ⏱️ **Duration Management** - Automatic duration extraction and metadata updates
 - ⚙️ **Flexible Configuration** - Centralized config with environment variable support
 - 🧭 **Editable Prompts** - Markdown system/user prompts with variants (default/detailed) and config-based file paths
 
 ## Tracked Podcasts
 
-Currently tracking 4 Japanese learning channels:
-- **hnh** - Haru no nihongo
+Currently tracking 4 Japanese language learning channels:
 - **sjn** - Speak Japanese Naturally
 - **ss** - Sayuri Saying
 - **yuyu** - Yuyu no nihongo
+- **hnh** - Haru no nihongo
 
 ## Setup
 
