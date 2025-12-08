@@ -13,7 +13,7 @@ from mutagen import MutagenError
 
 # Import config loading functions
 try:
-    from find_podcasts import load_config, find_podcast_by_name, format_date
+    from channel_fetcher import load_config, find_podcast_by_name, format_date
 except ImportError:
     def load_config(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:

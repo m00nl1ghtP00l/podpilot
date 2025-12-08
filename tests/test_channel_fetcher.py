@@ -1,5 +1,5 @@
 """
-Tests for find_podcasts.py
+Tests for channel_fetcher.py
 
 This test suite covers:
 - Title cleaning with Japanese character handling
@@ -25,7 +25,7 @@ import xml.etree.ElementTree as ET
 # Add parent directory to path to import the module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from find_podcasts import (
+from channel_fetcher import (
     clean_title,
     validate_channel_id,
     parse_date,
@@ -314,7 +314,7 @@ class TestCleanDescription:
 class TestFetchRssFeed:
     """Tests for fetch_rss_feed function"""
     
-    @patch('find_podcasts.urllib.request.urlopen')
+    @patch('channel_fetcher.urllib.request.urlopen')
     def test_fetch_rss_feed_success(self, mock_urlopen):
         """Test successful RSS feed fetch"""
         mock_response = Mock()
@@ -325,7 +325,7 @@ class TestFetchRssFeed:
         assert result == '<?xml version="1.0"?><feed></feed>'
         mock_urlopen.assert_called_once()
     
-    @patch('find_podcasts.urllib.request.urlopen')
+    @patch('channel_fetcher.urllib.request.urlopen')
     def test_fetch_rss_feed_url_error(self, mock_urlopen):
         """Test handling URL error"""
         import urllib.error
@@ -603,8 +603,8 @@ class TestFindPodcastByName:
 class TestMain:
     """Tests for main function"""
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     @patch('sys.stdout')
     def test_main_outputs_to_stdout(self, mock_stdout, mock_parse, mock_fetch):
         """Test that main outputs to stdout when no output file specified"""
@@ -615,14 +615,14 @@ class TestMain:
             'videos': []
         }
         
-        with patch('sys.argv', ['find_podcasts.py', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             main()
         
         # Should have called print (stdout.write)
         assert mock_stdout.write.called or True  # May use print() instead
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_writes_to_file(self, mock_parse, mock_fetch):
         """Test that main writes to file when -o specified"""
         mock_fetch.return_value = "<feed></feed>"
@@ -636,7 +636,7 @@ class TestMain:
             output_file = f.name
         
         try:
-            with patch('sys.argv', ['find_podcasts.py', '-o', output_file, 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+            with patch('sys.argv', ['channel_fetcher.py', '-o', output_file, 'UCauyM-A8JIJ9NQcw5_jF00Q']):
                 main()
             
             assert os.path.exists(output_file)
@@ -647,8 +647,8 @@ class TestMain:
             if os.path.exists(output_file):
                 os.remove(output_file)
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_date_filtering(self, mock_parse, mock_fetch):
         """Test that date filtering is passed correctly"""
         mock_fetch.return_value = "<feed></feed>"
@@ -658,7 +658,7 @@ class TestMain:
             'videos': []
         }
         
-        with patch('sys.argv', ['find_podcasts.py', '-f', '2024-01-01', '-t', '2024-01-31', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-f', '2024-01-01', '-t', '2024-01-31', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             main()
         
         # Verify parse_rss_feed was called with date filters
@@ -669,13 +669,13 @@ class TestMain:
     
     def test_main_invalid_channel_id(self):
         """Test that invalid channel ID raises error"""
-        with patch('sys.argv', ['find_podcasts.py', 'invalid-id']):
+        with patch('sys.argv', ['channel_fetcher.py', 'invalid-id']):
             with pytest.raises((SystemExit, ValueError)):
                 main()
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
-    @patch('find_podcasts.display_readable_format')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
+    @patch('channel_fetcher.display_readable_format')
     def test_main_readable_format(self, mock_display, mock_parse, mock_fetch):
         """Test that --format readable calls display_readable_format"""
         mock_fetch.return_value = "<feed></feed>"
@@ -686,16 +686,16 @@ class TestMain:
         }
         mock_display.return_value = "Readable output"
         
-        with patch('sys.argv', ['find_podcasts.py', '-F', 'readable', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-F', 'readable', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print') as mock_print:
                 main()
         
         mock_display.assert_called_once()
         mock_print.assert_called()
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
-    @patch('find_podcasts.json.dumps')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
+    @patch('channel_fetcher.json.dumps')
     def test_main_json_format_default(self, mock_json, mock_parse, mock_fetch):
         """Test that default format is JSON"""
         mock_fetch.return_value = "<feed></feed>"
@@ -706,14 +706,14 @@ class TestMain:
         }
         mock_json.return_value = '{"title": "Test"}'
         
-        with patch('sys.argv', ['find_podcasts.py', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
         mock_json.assert_called_once()
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_include_author(self, mock_parse, mock_fetch):
         """Test that --include-author flag is passed to parse_rss_feed"""
         mock_fetch.return_value = "<feed></feed>"
@@ -723,7 +723,7 @@ class TestMain:
             'videos': []
         }
         
-        with patch('sys.argv', ['find_podcasts.py', '-a', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-a', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
@@ -731,8 +731,8 @@ class TestMain:
         call_args = mock_parse.call_args
         assert call_args[1]['include_author'] is True
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_include_description(self, mock_parse, mock_fetch):
         """Test that --include-description flag is passed to parse_rss_feed"""
         mock_fetch.return_value = "<feed></feed>"
@@ -742,7 +742,7 @@ class TestMain:
             'videos': []
         }
         
-        with patch('sys.argv', ['find_podcasts.py', '-d', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-d', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
@@ -750,8 +750,8 @@ class TestMain:
         call_args = mock_parse.call_args
         assert call_args[1]['include_description'] is True
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_sort_date_asc(self, mock_parse, mock_fetch):
         """Test that --sort date-asc sorts videos ascending"""
         mock_fetch.return_value = "<feed></feed>"
@@ -765,7 +765,7 @@ class TestMain:
         }
         mock_parse.return_value = channel_info
         
-        with patch('sys.argv', ['find_podcasts.py', '-s', 'date-asc', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-s', 'date-asc', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
@@ -773,8 +773,8 @@ class TestMain:
         assert channel_info['videos'][0]['published'] == '2024-01-10 10:00'
         assert channel_info['videos'][1]['published'] == '2024-01-15 10:00'
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_sort_date_desc(self, mock_parse, mock_fetch):
         """Test that --sort date-desc sorts videos descending"""
         mock_fetch.return_value = "<feed></feed>"
@@ -788,7 +788,7 @@ class TestMain:
         }
         mock_parse.return_value = channel_info
         
-        with patch('sys.argv', ['find_podcasts.py', '-s', 'date-desc', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-s', 'date-desc', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
@@ -796,9 +796,9 @@ class TestMain:
         assert channel_info['videos'][0]['published'] == '2024-01-15 10:00'
         assert channel_info['videos'][1]['published'] == '2024-01-10 10:00'
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
-    @patch('find_podcasts.json.dumps')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
+    @patch('channel_fetcher.json.dumps')
     def test_main_clean_desc_with_description(self, mock_json, mock_parse, mock_fetch):
         """Test that --clean-desc flag works with --include-description"""
         mock_fetch.return_value = "<feed></feed>"
@@ -815,7 +815,7 @@ class TestMain:
         mock_parse.return_value = channel_info
         mock_json.return_value = '{}'
         
-        with patch('sys.argv', ['find_podcasts.py', '-c', '-d', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
+        with patch('sys.argv', ['channel_fetcher.py', '-c', '-d', 'UCauyM-A8JIJ9NQcw5_jF00Q']):
             with patch('builtins.print'):
                 main()
         
@@ -824,9 +824,9 @@ class TestMain:
         # This test verifies clean-desc flag is recognized
         mock_json.assert_called_once()
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
-    @patch('find_podcasts.load_config')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
+    @patch('channel_fetcher.load_config')
     def test_main_with_config_and_name(self, mock_load, mock_parse, mock_fetch, tmp_path):
         """Test using --config and --name to lookup channel_id"""
         # Create a test config file
@@ -850,7 +850,7 @@ class TestMain:
         }
         mock_load.return_value = config_data
         
-        with patch('sys.argv', ['find_podcasts.py', '--config', str(config_file), '--name', 'test']):
+        with patch('sys.argv', ['channel_fetcher.py', '--config', str(config_file), '--name', 'test']):
             with patch('builtins.print'):
                 main()
         
@@ -859,14 +859,14 @@ class TestMain:
         # Verify fetch_rss_feed was called with the channel_id from config
         mock_fetch.assert_called_once_with("UC1234567890123456789012")
     
-    @patch('find_podcasts.load_config')
+    @patch('channel_fetcher.load_config')
     def test_main_config_without_name(self, mock_load):
         """Test that --config without --name raises error"""
-        with patch('sys.argv', ['find_podcasts.py', '--config', 'config.json']):
+        with patch('sys.argv', ['channel_fetcher.py', '--config', 'config.json']):
             with pytest.raises(SystemExit):
                 main()
     
-    @patch('find_podcasts.load_config')
+    @patch('channel_fetcher.load_config')
     def test_main_config_invalid_podcast_name(self, mock_load, tmp_path):
         """Test that invalid podcast name in config raises error"""
         config_file = tmp_path / "config.json"
@@ -881,18 +881,18 @@ class TestMain:
         config_file.write_text(json.dumps(config_data), encoding='utf-8')
         mock_load.return_value = config_data
         
-        with patch('sys.argv', ['find_podcasts.py', '--config', str(config_file), '--name', 'nonexistent']):
+        with patch('sys.argv', ['channel_fetcher.py', '--config', str(config_file), '--name', 'nonexistent']):
             with pytest.raises(SystemExit):
                 main()
     
     def test_main_no_channel_id_or_config(self):
         """Test that missing both channel_id and config raises error"""
-        with patch('sys.argv', ['find_podcasts.py']):
+        with patch('sys.argv', ['channel_fetcher.py']):
             with pytest.raises(SystemExit):
                 main()
     
-    @patch('find_podcasts.fetch_rss_feed')
-    @patch('find_podcasts.parse_rss_feed')
+    @patch('channel_fetcher.fetch_rss_feed')
+    @patch('channel_fetcher.parse_rss_feed')
     def test_main_config_with_date_filtering(self, mock_parse, mock_fetch, tmp_path):
         """Test that date filtering works with config file"""
         config_file = tmp_path / "config.json"
@@ -913,8 +913,8 @@ class TestMain:
             'videos': []
         }
         
-        with patch('find_podcasts.load_config', return_value=config_data):
-            with patch('sys.argv', ['find_podcasts.py', '--config', str(config_file), '--name', 'test',
+        with patch('channel_fetcher.load_config', return_value=config_data):
+            with patch('sys.argv', ['channel_fetcher.py', '--config', str(config_file), '--name', 'test',
                                     '-f', '2024-01-01', '-t', '2024-01-31']):
                 with patch('builtins.print'):
                     main()

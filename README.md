@@ -23,6 +23,7 @@ Podpilot automates the process of:
 - 🤖 **LLM Integration** - Generate JLPT-style lessons from transcriptions (Ollama, OpenAI, Anthropic)
 - ⏱️ **Duration Management** - Automatic duration extraction and metadata updates
 - ⚙️ **Flexible Configuration** - Centralized config with environment variable support
+- 🧭 **Editable Prompts** - Markdown system/user prompts with variants (default/detailed) and config-based file paths
 
 ## Tracked Podcasts
 
@@ -65,9 +66,9 @@ Then edit `config/podcasts.json` to add or modify the channels you want to track
   "min_duration": 300,
   "youtube_channels": [
     {
-      "channel_name_short": "hnh",
-      "channel_name_long": "Haru no nihongo",
-      "channel_id": "UCauyM-A8JIJ9NQcw5_jF00Q"
+      "channel_name_short": "sjn",
+      "channel_name_long":"Speak Japanese Naturally",
+      "channel_id": "UC_NROu3WWx1KZ7tNl275F7A"
     }
   ]
 }
@@ -121,12 +122,12 @@ The location depends on which script you use:
 ### Find New Podcast Episodes
 
 ```bash
-python find_podcasts.py <channel_short_name> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
+python channel_fetcher.py <channel_short_name> [--from-date YYYY-MM-DD] [--to-date YYYY-MM-DD]
 ```
 
 Example:
 ```bash
-python find_podcasts.py hnh --from-date 2024-01-01 --to-date 2024-01-31
+python channel_fetcher.py hnh --from-date 2024-01-01 --to-date 2024-01-31
 ```
 
 ### Download Audio Files
@@ -144,13 +145,16 @@ python download_audio.py --name <podcast_name> [--config CONFIG] [-a AUDIO_DIR] 
 Examples:
 ```bash
 # Direct JSON file (defaults to ./downloads)
-python download_audio.py hnh.json --from-date 2024-01-01
+python download_audio.py sjn.json --from-date 2024-01-01
 
 # Using config file (uses data_root/podcast_name from config)
-python download_audio.py --name hnh --from-date 2024-01-01
+python download_audio.py --name sjn --from-date 2024-01-01
+
+# Download the last 7 days
+python download_audio.py --name sjn -f 7d
 
 # Custom audio directory
-python download_audio.py --name hnh -a /custom/path --from-date 2024-01-01
+python download_audio.py --name sjn -a /custom/path --from-date 2024-01-01
 ```
 
 **Note:** When using `--name`, audio files are stored in `{data_root}/{channel_name}` from your config. When using a direct JSON file, files default to `./downloads` unless you specify `-a/--audio-dir`.
@@ -211,6 +215,27 @@ python generate_lesson.py --name hnh --simulate
 python generate_lesson.py --name hnh --skip-existing
 ```
 
+### Prompts (System vs User)
+
+- **System prompt**: sets the model’s role, tone, and required output format. Lives in `adapters/prompts/{lang}/system_prompt_default.md` (or variant files). Loaded once per request.
+- **User prompt**: supplies the actual transcription and episode title for the current run. Lives in `adapters/prompts/{lang}/user_prompt_default.md` (or variant files). Filled with `{episode_title_section}` and `{transcription_text}` at runtime.
+- **Variants / Custom prompts**: default (`*_default.md`) are tracked; you can point to any custom prompt files via config (names are up to you).
+- **Configure prompt files**: in `config/podcasts.json` under `analysis.prompt_files` (any filenames, including your own custom ones, are fine):
+  ```json
+  "analysis": {
+    "provider": "ollama",
+    "model": "qwen2.5:14b",
+    "prompt_files": {
+      "system": "adapters/prompts/ja/my_system_prompt.md",
+      "user": "adapters/prompts/ja/my_user_prompt.md"
+    },
+    "prompt_variant": "detailed"
+  }
+  ```
+  - If `prompt_files` is set, those paths are used (with env var expansion) — you can name them anything.
+  - If `prompt_variant` is set (e.g., `myprompt`), the code looks for `system_prompt_{variant}.md` and `user_prompt_{variant}.md` in the language folder.
+  - If neither is set, it falls back to `*_default.md`.
+
 ### Update Duration Metadata
 
 ```bash
@@ -223,7 +248,7 @@ This updates the metadata JSON file with duration information extracted from aud
 
 ```
 podpilot/
-├── find_podcasts.py              # Find episodes from YouTube RSS feeds
+├── channel_fetcher.py            # Find episodes from YouTube RSS feeds
 ├── download_audio.py             # Download audio from YouTube
 ├── transcribe.py                 # Transcribe using OpenAI Whisper API
 ├── local_whisper_transcribe.py   # Transcribe using local whisper.cpp
@@ -232,6 +257,15 @@ podpilot/
 ├── generate_lesson.py            # Generate JLPT lessons from transcriptions
 ├── llm_providers.py              # LLM provider implementations (Ollama, OpenAI, Anthropic)
 ├── llm_config.py                 # LLM configuration defaults
+├── adapters/                     # Language adapters and prompts
+│   ├── base.py
+│   ├── japanese.py
+│   ├── example_english.py
+│   └── prompts/
+│       └── ja/
+│           ├── system_prompt_default.md
+│           └── user_prompt_default.md
+│           # Custom prompts eg *<personal>.md are gitignored
 ├── podcast_downloader.py        # Alternative downloader implementation
 ├── config/                       # Configuration files
 │   ├── podcasts.json.example     # Example configuration
@@ -243,7 +277,7 @@ podpilot/
 │   └── run_tests.sh
 ├── tests/                        # Test suite
 │   ├── test_download_audio.py
-│   ├── test_find_podcasts.py
+│   ├── test_channel_fetcher.py
 │   ├── test_transcribe.py
 │   ├── test_local_whisper_transcribe.py
 │   ├── test_mp3_transcoder.py

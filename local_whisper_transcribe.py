@@ -10,7 +10,7 @@ import subprocess
 from tqdm import tqdm
 from datetime import timezone
 import shutil
-from find_podcasts import load_config, find_podcast_by_name, sanitize_filename
+from channel_fetcher import load_config, find_podcast_by_name, sanitize_filename
 
 # Import language adapter system
 try:
@@ -200,7 +200,7 @@ def get_video_id_from_metadata(file_path):
                 metadata = json.load(f)
             
             # Use sanitize_filename for consistent matching (handles underscore differences)
-            from find_podcasts import sanitize_filename
+            from channel_fetcher import sanitize_filename
             sanitized_base_name = sanitize_filename(base_name)
             
             # Look for the video with matching filename

@@ -38,7 +38,7 @@ from download_audio import (
     get_youtube_duration,
     main
 )
-from find_podcasts import load_config, find_podcast_by_name
+from channel_fetcher import load_config, find_podcast_by_name
 from update_durations import format_duration, update_video_duration
 
 

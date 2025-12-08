@@ -158,8 +158,8 @@ class TestProcessSingleFile:
         mock_generate.assert_called_once()
         mock_save.assert_called_once()
     
-    @patch('process_lessons.get_provider')
-    @patch('process_lessons.load_transcription')
+    @patch('generate_lesson.get_provider')
+    @patch('generate_lesson.load_transcription')
     def test_process_single_file_empty_transcription(self, mock_load, mock_get_provider, tmp_path):
         """Test processing file with empty transcription"""
         txt_file = tmp_path / "2024-01-15_transcript.txt"
@@ -174,8 +174,8 @@ class TestProcessSingleFile:
         assert result[1] is False
         assert "Empty transcription" in result[2]
     
-    @patch('process_lessons.get_provider')
-    @patch('process_lessons.load_transcription')
+    @patch('generate_lesson.get_provider')
+    @patch('generate_lesson.load_transcription')
     def test_process_single_file_error(self, mock_load, mock_get_provider, tmp_path):
         """Test processing file with error"""
         txt_file = tmp_path / "2024-01-15_transcript.txt"

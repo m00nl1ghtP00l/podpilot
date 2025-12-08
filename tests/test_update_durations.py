@@ -28,7 +28,7 @@ from update_durations import (
     find_audio_file,
     update_metadata_durations
 )
-from find_podcasts import sanitize_filename
+from channel_fetcher import sanitize_filename
 
 
 class TestFormatDuration:

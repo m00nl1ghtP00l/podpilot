@@ -129,10 +129,12 @@ class JapaneseAdapter(LanguageAdapter):
         # Remove emojis while preserving Japanese
         result = _remove_emojis_preserving_japanese(title, jp_segments)
         
-        # Extract Japanese segments again from emoji-removed result
+        # Normalize full-width spaces to regular spaces before processing
+        result = result.replace('\u3000', ' ')  # Full-width space (U+3000)
+        
+        # Extract Japanese segments again from emoji-removed and normalized result
         jp_segments_final = _extract_japanese_segments(result)
         
-        # Convert spaces to underscores while preserving Japanese
         final_result = []
         last_end = 0
         
@@ -157,6 +159,9 @@ class JapaneseAdapter(LanguageAdapter):
         invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
         for char in invalid_chars:
             cleaned = cleaned.replace(char, '_')
+        
+        # Final pass: replace any remaining spaces (including full-width) with underscores
+        cleaned = cleaned.replace(' ', '_').replace('\u3000', '_')
         
         return cleaned.strip('_')
     

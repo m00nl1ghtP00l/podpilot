@@ -52,7 +52,7 @@ pytest -v
 
 Tests are organized by the function/class they test. Test files include:
 - `test_download_audio.py` - Tests for download functionality
-- `test_find_podcasts.py` - Tests for podcast discovery
+- `test_channel_fetcher.py` - Tests for channel fetching
 - `test_transcribe.py` - Tests for OpenAI transcription
 - `test_local_whisper_transcribe.py` - Tests for local Whisper transcription
 - `test_mp3_transcoder.py` - Tests for audio transcoding

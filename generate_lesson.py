@@ -104,9 +104,9 @@ Create a comprehensive lesson by extracting:
 
 # Import config loading functions
 try:
-    from find_podcasts import load_config, find_podcast_by_name
+    from channel_fetcher import load_config, find_podcast_by_name
 except ImportError:
-    # Fallback if find_podcasts is not available
+    # Fallback if channel_fetcher is not available
     def load_config(config_file):
         with open(config_file, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -211,8 +211,9 @@ def generate_lesson(provider: LLMProvider, transcription_text: str,
             for line in lines:
                 if line.strip().startswith('```'):
                     in_code_block = not in_code_block
-                    continue
-                if not in_code_block:
+                    continue  # Skip the ``` lines themselves
+                if in_code_block:
+                    # Keep content that's inside the code block
                     content_lines.append(line)
             markdown_content = '\n'.join(content_lines).strip()
         

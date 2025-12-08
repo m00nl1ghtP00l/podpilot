@@ -9,7 +9,7 @@ from datetime import timezone
 import sys
 
 # Import functions from other modules
-from find_podcasts import clean_title, fetch_rss_feed, parse_rss_feed, load_config
+from channel_fetcher import clean_title, fetch_rss_feed, parse_rss_feed, load_config
 from download_audio import download_file, process_existing_file
 
 # Import language adapter system
@@ -332,7 +332,7 @@ def download_audio_files(json_file, audio_dir, from_date, to_date, force_downloa
             print(f"Warning: Could not parse date {date_str} for video {title}")
             continue
         
-        # Use clean_filename from find_podcasts if available, otherwise generate one
+        # Use clean_filename from channel_fetcher if available, otherwise generate one
         if 'clean_filename' in video:
             filename = f"{video['clean_filename']}.mp3"
         else:

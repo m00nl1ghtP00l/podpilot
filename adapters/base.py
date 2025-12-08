@@ -41,7 +41,7 @@ class LanguageAdapter(ABC):
         Args:
             variant: Optional prompt variant name (e.g., "detailed", "simple")
                     If provided, looks for system_prompt_{variant}.md
-                    Otherwise uses system_prompt.md
+                    Otherwise uses system_prompt_default.md
             prompt_files: Optional dict from config with "system" and "user" file paths
                         If provided, loads from these paths (with env var expansion)
                         Takes precedence over variant and default files
@@ -49,7 +49,7 @@ class LanguageAdapter(ABC):
         Priority:
         1. prompt_files["system"] (if provided in config)
         2. adapters/prompts/{language_code}/system_prompt_{variant}.md (if variant specified)
-        3. adapters/prompts/{language_code}/system_prompt.md (default)
+        3. adapters/prompts/{language_code}/system_prompt_default.md (default)
         4. Simple fallback prompt
         """
         # Check config prompt_files first
@@ -63,7 +63,7 @@ class LanguageAdapter(ABC):
         if variant:
             prompt_path = prompts_dir / f"system_prompt_{variant}.md"
         else:
-            prompt_path = prompts_dir / "system_prompt.md"
+            prompt_path = prompts_dir / "system_prompt_default.md"
         
         if prompt_path.exists():
             return prompt_path.read_text(encoding='utf-8').strip()
@@ -75,16 +75,16 @@ class LanguageAdapter(ABC):
         
         Args:
             variant: Optional prompt variant name (e.g., "detailed", "simple")
-                    If provided, looks for user_prompt_template_{variant}.md
-                    Otherwise uses user_prompt_template.md
+                    If provided, looks for user_prompt_{variant}.md
+                    Otherwise uses user_prompt_default.md
             prompt_files: Optional dict from config with "system" and "user" file paths
                         If provided, loads from these paths (with env var expansion)
                         Takes precedence over variant and default files
         
         Priority:
         1. prompt_files["user"] (if provided in config)
-        2. adapters/prompts/{language_code}/user_prompt_template_{variant}.md (if variant specified)
-        3. adapters/prompts/{language_code}/user_prompt_template.md (default)
+        2. adapters/prompts/{language_code}/user_prompt_{variant}.md (if variant specified)
+        3. adapters/prompts/{language_code}/user_prompt_default.md (default)
         4. Simple fallback template
         
         Should include placeholders like {episode_title_section} and {transcription_text}
@@ -98,9 +98,9 @@ class LanguageAdapter(ABC):
         # Fall back to file-based lookup
         prompts_dir = Path(__file__).parent / "prompts" / self.language_code
         if variant:
-            prompt_path = prompts_dir / f"user_prompt_template_{variant}.md"
+            prompt_path = prompts_dir / f"user_prompt_{variant}.md"
         else:
-            prompt_path = prompts_dir / "user_prompt_template.md"
+            prompt_path = prompts_dir / "user_prompt_default.md"
         
         if prompt_path.exists():
             return prompt_path.read_text(encoding='utf-8').strip()

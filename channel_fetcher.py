@@ -461,7 +461,7 @@ def main():
                        help='View existing JSON file in readable format. Provide file path, or use with --name to view from data_root')
     
     # If script is run with no arguments at all, show both usage and full help.
-    # This makes `python find_podcasts.py` self-explanatory instead of just erroring.
+    # This makes `python channel_fetcher.py` self-explanatory instead of just erroring.
     if len(sys.argv) == 1:
         parser.print_usage()
         print()
@@ -498,7 +498,7 @@ def main():
             print(display_readable_format(channel_info))
         except FileNotFoundError:
             sys.stderr.write(f"Error: File not found: {view_file}\n")
-            sys.stderr.write(f"Hint: Run 'find_podcasts.py --name <podcast_name>' first to create the metadata file.\n")
+            sys.stderr.write(f"Hint: Run 'channel_fetcher.py --name <podcast_name>' first to create the metadata file.\n")
             sys.exit(1)
         except json.JSONDecodeError as e:
             sys.stderr.write(f"Error: Invalid JSON in file: {e}\n")
@@ -588,7 +588,7 @@ def main():
             # Show absolute path for clarity
             abs_path = os.path.abspath(output_file)
             print(f"Results written to {abs_path}")
-            print(f"\nTo view this file: find_podcasts.py --view --name {args.name if args.name else 'PODCAST_NAME'}")
+            print(f"\nTo view this file: channel_fetcher.py --view --name {args.name if args.name else 'PODCAST_NAME'}")
         except IOError as e:
             sys.stderr.write(f"Error writing to output file: {e}\n")
             sys.exit(1)

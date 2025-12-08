@@ -23,7 +23,6 @@ from generate_lesson import (
     load_transcription,
     generate_lesson,
     save_lesson,
-    format_lesson_markdown,
     main
 )
 from llm_providers import LLMProvider
@@ -103,58 +102,53 @@ class TestGenerateLesson:
     def test_generate_lesson_success(self):
         """Test successful lesson generation"""
         mock_provider = Mock(spec=LLMProvider)
-        mock_provider.generate.return_value = json.dumps({
-            "vocabulary": [{"word": "テスト", "meaning": "test"}],
-            "grammar_points": [],
-            "key_phrases": [],
-            "summary": "Test summary"
-        })
+        mock_provider.generate.return_value = """## Summary
+Test summary
+
+## Vocabulary
+- テスト (test) - test meaning"""
         
         result = generate_lesson(mock_provider, "Test transcription text")
         
-        assert "vocabulary" in result
-        assert "summary" in result
+        assert "markdown" in result
+        assert "Summary" in result["markdown"] or "テスト" in result["markdown"]
         mock_provider.generate.assert_called_once()
     
     def test_generate_lesson_with_episode_title(self):
         """Test lesson generation with episode title"""
         mock_provider = Mock(spec=LLMProvider)
-        mock_provider.generate.return_value = json.dumps({
-            "vocabulary": [],
-            "grammar_points": [],
-            "key_phrases": [],
-            "summary": "Test"
-        })
+        mock_provider.generate.return_value = "## Summary\nTest"
         
         result = generate_lesson(mock_provider, "Test text", episode_title="Test Episode")
         
         assert result is not None
+        assert "markdown" in result
         # Check that title was included in prompt
         call_args = mock_provider.generate.call_args
         assert "Test Episode" in call_args[1]["prompt"] or "Test Episode" in call_args[0][0]
     
     def test_generate_lesson_with_markdown_wrapped_json(self):
-        """Test lesson generation with JSON wrapped in markdown code blocks"""
+        """Test lesson generation with markdown wrapped in code blocks"""
         mock_provider = Mock(spec=LLMProvider)
-        mock_provider.generate.return_value = """```json
-{
-  "vocabulary": [],
-  "summary": "Test"
-}
+        mock_provider.generate.return_value = """```markdown
+## Summary
+Test summary
 ```"""
         
         result = generate_lesson(mock_provider, "Test text")
         
-        assert "vocabulary" in result
-        assert "summary" in result
+        assert "markdown" in result
+        assert "Summary" in result["markdown"] or "Test summary" in result["markdown"]
     
-    def test_generate_lesson_invalid_json(self):
-        """Test lesson generation with invalid JSON response"""
+    def test_generate_lesson_with_plain_text(self):
+        """Test lesson generation with plain text response (should work as markdown)"""
         mock_provider = Mock(spec=LLMProvider)
-        mock_provider.generate.return_value = "This is not JSON"
+        mock_provider.generate.return_value = "This is plain text markdown content"
         
-        with pytest.raises(RuntimeError, match="Failed to parse lesson JSON"):
-            generate_lesson(mock_provider, "Test text")
+        result = generate_lesson(mock_provider, "Test text")
+        
+        assert "markdown" in result
+        assert "This is plain text markdown content" in result["markdown"]
 
 
 class TestSaveLesson:
@@ -163,8 +157,7 @@ class TestSaveLesson:
     def test_save_lesson_json(self, tmp_path):
         """Test saving lesson as JSON"""
         lesson_data = {
-            "vocabulary": [{"word": "テスト", "meaning": "test"}],
-            "summary": "Test summary"
+            "markdown": "## Summary\nTest summary\n## Vocabulary\n- テスト (test) - test meaning"
         }
         output_path = tmp_path / "lesson.json"
         
@@ -172,13 +165,12 @@ class TestSaveLesson:
         
         assert output_path.exists()
         loaded = json.loads(output_path.read_text())
-        assert loaded["vocabulary"] == lesson_data["vocabulary"]
+        assert "markdown" in loaded
     
     def test_save_lesson_markdown(self, tmp_path):
         """Test saving lesson as markdown"""
         lesson_data = {
-            "vocabulary": [{"word": "テスト", "meaning": "test"}],
-            "summary": "Test summary"
+            "markdown": "## Summary\nTest summary\n## Vocabulary\n- テスト (test) - test meaning"
         }
         output_path = tmp_path / "lesson.md"
         
@@ -186,52 +178,9 @@ class TestSaveLesson:
         
         assert output_path.exists()
         content = output_path.read_text()
-        assert "テスト" in content
+        assert "テスト" in content or "Summary" in content
         assert "Test summary" in content
 
 
-class TestFormatLessonMarkdown:
-    """Tests for format_lesson_markdown function"""
-    
-    def test_format_lesson_markdown_basic(self):
-        """Test formatting basic lesson as markdown"""
-        lesson_data = {
-            "vocabulary": [
-                {"word": "テスト", "reading": "てすと", "meaning": "test", "jlpt_level": "N5"}
-            ],
-            "grammar_points": [],
-            "key_phrases": [],
-            "summary": "Test summary"
-        }
-        
-        result = format_lesson_markdown(lesson_data)
-        
-        assert "テスト" in result
-        assert "てすと" in result
-        assert "test" in result
-        assert "N5" in result
-        assert "Test summary" in result
-    
-    def test_format_lesson_markdown_with_grammar(self):
-        """Test formatting lesson with grammar points"""
-        lesson_data = {
-            "vocabulary": [],
-            "grammar_points": [
-                {
-                    "pattern": "〜です",
-                    "explanation": "Polite copula",
-                    "jlpt_level": "N5",
-                    "example_sentence": "これは本です",
-                    "example_translation": "This is a book"
-                }
-            ],
-            "key_phrases": [],
-            "summary": "Test"
-        }
-        
-        result = format_lesson_markdown(lesson_data)
-        
-        assert "〜です" in result
-        assert "Polite copula" in result
-        assert "これは本です" in result
+# Note: format_lesson_markdown function was removed - lessons are now saved directly as markdown
 

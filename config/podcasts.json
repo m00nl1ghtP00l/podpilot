@@ -4,7 +4,11 @@
   "analysis": {
     "provider": "ollama",
     "model": "qwen2.5:14b",
-    "base_url": "http://localhost:11434"
+    "base_url": "http://localhost:11434",
+    "prompt_files": {
+      "system": "adapters/prompts/ja/system_prompt_detailed.md",
+      "user": "adapters/prompts/ja/user_prompt_detailed.md"
+    }
   },
   "transcription": {
     "provider": "whisper.cpp",

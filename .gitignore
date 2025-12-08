@@ -65,6 +65,9 @@ htmlcov/
 commands.txt
 config/podcasts.json
 
+# Detailed prompt files (user-specific)
+adapters/prompts/**/*_detailed.md
+
 # Ollama model files
 *.Modelfile 
 

@@ -13,8 +13,8 @@ from mp3_transcoder import transcode
 import unicodedata
 import yt_dlp  # Added yt-dlp for reliable audio extraction
 
-# Import functions from find_podcasts.py
-from find_podcasts import clean_title, load_config, find_podcast_by_name, sanitize_filename
+# Import functions from channel_fetcher.py
+from channel_fetcher import clean_title, load_config, find_podcast_by_name, sanitize_filename
 
 # Import duration utilities from update_durations.py
 from update_durations import format_duration, update_video_duration, update_metadata_durations
@@ -28,9 +28,9 @@ def load_json(json_file):
             raise ValueError("Missing 'videos' key")
         return data
     except FileNotFoundError:
-        # Provide helpful error message suggesting to run find_podcasts.py first
+        # Provide helpful error message suggesting to run channel_fetcher.py first
         raise ValueError(f"File not found: {json_file}\n"
-                        f"Hint: Run 'find_podcasts.py --name <podcast_name>' first to create the metadata file.")
+                        f"Hint: Run 'channel_fetcher.py --name <podcast_name>' first to create the metadata file.")
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON: {e}")
     except ValueError:
@@ -457,7 +457,7 @@ def download_mode(json_data, output_dir, args, json_file=None):
                 print(f"Warning: Could not parse date {date_str} for video {title}")
                 continue
         
-        # Use clean_filename from find_podcasts if available, otherwise generate one
+        # Use clean_filename from channel_fetcher if available, otherwise generate one
         if 'clean_filename' in video:
             # Sanitize the filename to remove any invalid characters (e.g., /, \, :, etc.)
             # This handles cases where old metadata files might have invalid characters
