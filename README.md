@@ -9,18 +9,18 @@ Podpilot automates the process of:
 2. **Downloading** audio files from YouTube videos (with duration filtering)
 3. **Transcoding** audio files to optimize size (target: 25MB for API limits)
 4. **Transcribing** audio using either OpenAI Whisper API or local Whisper CLI
-5. **Generating lessons** from transcriptions using LLMs (Ollama, OpenAI, Anthropic)
+5. **Generating content** from transcriptions using LLMs (Ollama, OpenAI, Anthropic)
 6. **Updating metadata** with duration information
 
 ## Features
 
 - 🎯 **Japanese Language Focus** - Optimized for Japanese podcast transcription
 - 🎨 **Japanese Character Handling** - Properly handles Japanese characters in filenames
-- 🤖 **LLM Integration** - Generate JLPT-style lessons from transcriptions (Ollama, OpenAI, Anthropic)
 - 📅 **Date Range Filtering** - Download/transcribe episodes from specific date ranges
 - 🔄 **Dual Transcription** - Support for both OpenAI Whisper API and local whisper.cpp
 - 📦 **Smart Transcoding** - Automatically reduces file size to meet API limits
 - 📊 **Progress Tracking** - Visual progress bars for downloads
+- 🤖 **LLM Integration** - Generate content from transcriptions (Ollama, OpenAI, Anthropic)
 - ⏱️ **Duration Management** - Automatic duration extraction and metadata updates
 - ⚙️ **Flexible Configuration** - Centralized config with environment variable support
 - 🧭 **Editable Prompts** - Markdown system/user prompts with variants (default/detailed) and config-based file paths

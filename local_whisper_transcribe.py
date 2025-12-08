@@ -147,6 +147,15 @@ def transcribe_audio(file_path, model_config, language="ja", test_duration=None,
             print(f"Error running whisper-cli: {process.stderr}")
             return False
 
+        # whisper.cpp creates the SRT file by appending .srt to the input filename
+        # So file.mp3 becomes file.mp3.srt - we need to rename it to file.srt
+        whisper_srt_path = input_file_path.with_suffix(input_file_path.suffix + ".srt")
+        
+        # Check if whisper.cpp created the file with .mp3.srt extension
+        if whisper_srt_path.exists() and whisper_srt_path != srt_path:
+            print(f"Renaming SRT file from {whisper_srt_path.name} to {srt_path.name}")
+            whisper_srt_path.rename(srt_path)
+        
         print(f"Checking for SRT file at: {srt_path}")
         if not srt_path.exists():
             print(f"Error: SRT file not found at {srt_path}")
