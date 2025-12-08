@@ -464,7 +464,7 @@ class TestTranscribeAudio:
         """Test successful transcription"""
         audio_file = tmp_path / "test.mp3"
         audio_file.touch()
-        srt_file = tmp_path / "test.mp3.srt"
+        srt_file = tmp_path / "test.srt"
         srt_file.touch()
         
         mock_subprocess.return_value = Mock(returncode=0, stderr='')

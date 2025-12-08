@@ -125,7 +125,7 @@ def transcribe_audio(file_path, model_config, language="ja", test_duration=None,
         input_file_path = Path(file_path)
         base_filename = input_file_path.stem
         output_dir = input_file_path.parent
-        srt_path = input_file_path.with_suffix(input_file_path.suffix + ".srt")
+        srt_path = input_file_path.with_suffix(".srt")
         text_path = output_dir / f"{base_filename}.txt"
 
         cmd = [
