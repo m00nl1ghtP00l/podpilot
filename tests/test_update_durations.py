@@ -1,5 +1,5 @@
 """
-Tests for update_durations.py
+Tests for extract_duration.py
 
 This test suite covers:
 - Duration formatting
@@ -20,13 +20,13 @@ import sys
 # Add parent directory to path to import the module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from update_durations import (
+from extract_duration import (
     format_duration,
     update_video_duration,
     update_video_duration_from_file,
     get_audio_duration,
     find_audio_file,
-    update_metadata_durations
+    extract_metadata_duration
 )
 from channel_fetcher import sanitize_filename
 
@@ -137,7 +137,7 @@ class TestSanitizeFilename:
 class TestGetAudioDuration:
     """Tests for get_audio_duration function"""
     
-    @patch('update_durations.MP3')
+    @patch('extract_duration.MP3')
     def test_get_audio_duration_success(self, mock_mp3):
         """Test successfully getting duration from audio file"""
         mock_audio = MagicMock()
@@ -151,7 +151,7 @@ class TestGetAudioDuration:
         assert duration_seconds == 300.5
         assert duration_formatted == "05:00"
     
-    @patch('update_durations.MP3')
+    @patch('extract_duration.MP3')
     def test_get_audio_duration_failure(self, mock_mp3):
         """Test handling failure when getting duration"""
         from mutagen import MutagenError
@@ -160,7 +160,7 @@ class TestGetAudioDuration:
         result = get_audio_duration(Path("test.mp3"))
         assert result is None
     
-    @patch('update_durations.MP3')
+    @patch('extract_duration.MP3')
     def test_get_audio_duration_exception(self, mock_mp3):
         """Test handling general exception"""
         mock_mp3.side_effect = Exception("Unexpected error")
@@ -218,8 +218,8 @@ class TestFindAudioFile:
 class TestUpdateVideoDurationFromFile:
     """Tests for update_video_duration_from_file function"""
     
-    @patch('update_durations.get_audio_duration')
-    @patch('update_durations.find_audio_file')
+    @patch('extract_duration.get_audio_duration')
+    @patch('extract_duration.find_audio_file')
     def test_update_from_file_success(self, mock_find, mock_get_duration, tmp_path):
         """Test successfully updating duration from file"""
         audio_dir = tmp_path / "audio"
@@ -238,8 +238,8 @@ class TestUpdateVideoDurationFromFile:
         assert video['duration_seconds'] == 300
         assert video['duration'] == "05:00"
     
-    @patch('update_durations.get_audio_duration')
-    @patch('update_durations.find_audio_file')
+    @patch('extract_duration.get_audio_duration')
+    @patch('extract_duration.find_audio_file')
     def test_update_from_file_too_short(self, mock_find, mock_get_duration, tmp_path):
         """Test updating file that's too short"""
         audio_dir = tmp_path / "audio"
@@ -257,7 +257,7 @@ class TestUpdateVideoDurationFromFile:
         assert should_keep is False  # Too short, should be removed
         assert video['duration_seconds'] == 100
     
-    @patch('update_durations.find_audio_file')
+    @patch('extract_duration.find_audio_file')
     def test_update_from_file_already_has_duration(self, mock_find, tmp_path):
         """Test skipping file that already has duration"""
         audio_dir = tmp_path / "audio"
@@ -273,7 +273,7 @@ class TestUpdateVideoDurationFromFile:
         assert should_keep is True
         mock_find.assert_not_called()  # Shouldn't try to find file
     
-    @patch('update_durations.find_audio_file')
+    @patch('extract_duration.find_audio_file')
     def test_update_from_file_already_has_duration_too_short(self, mock_find, tmp_path):
         """Test file with duration that's too short"""
         audio_dir = tmp_path / "audio"
@@ -288,7 +288,7 @@ class TestUpdateVideoDurationFromFile:
         assert updated is False  # Didn't update (already had duration)
         assert should_keep is False  # Too short, should be removed
     
-    @patch('update_durations.find_audio_file')
+    @patch('extract_duration.find_audio_file')
     def test_update_from_file_not_found(self, mock_find, tmp_path):
         """Test when audio file is not found"""
         audio_dir = tmp_path / "audio"
@@ -301,10 +301,10 @@ class TestUpdateVideoDurationFromFile:
         assert should_keep is True  # Keep in metadata even if file not found
 
 
-class TestUpdateMetadataDurations:
-    """Tests for update_metadata_durations function"""
+class TestExtractMetadataDuration:
+    """Tests for extract_metadata_duration function"""
     
-    def test_update_metadata_durations(self, tmp_path):
+    def test_extract_metadata_duration(self, tmp_path):
         """Test updating metadata with durations"""
         # Create test metadata
         metadata_file = tmp_path / "metadata.json"
@@ -335,19 +335,19 @@ class TestUpdateMetadataDurations:
         test_file2 = audio_dir / "2025-01-02_Test2_test2.mp3"
         test_file2.write_bytes(b"fake audio")
         
-        with patch('update_durations.get_audio_duration') as mock_get:
+        with patch('extract_duration.get_audio_duration') as mock_get:
             mock_get.side_effect = [
                 (300.0, "05:00"),
                 (600.0, "10:00")
             ]
             
-            result = update_metadata_durations(metadata_file, audio_dir, verbose=False, min_duration=0)
+            result = extract_metadata_duration(metadata_file, audio_dir, verbose=False, min_duration=0)
             
             assert len(result['videos']) == 2
             assert result['videos'][0]['duration_seconds'] == 300
             assert result['videos'][1]['duration_seconds'] == 600
     
-    def test_update_metadata_durations_filters_short(self, tmp_path):
+    def test_extract_metadata_duration_filters_short(self, tmp_path):
         """Test that short videos are filtered out"""
         metadata_file = tmp_path / "metadata.json"
         audio_dir = tmp_path / "audio"
@@ -376,19 +376,19 @@ class TestUpdateMetadataDurations:
         test_file2 = audio_dir / "2025-01-02_Long_test2.mp3"
         test_file2.write_bytes(b"fake audio")
         
-        with patch('update_durations.get_audio_duration') as mock_get:
+        with patch('extract_duration.get_audio_duration') as mock_get:
             mock_get.side_effect = [
                 (100.0, "01:40"),  # Too short (< 300s)
                 (600.0, "10:00")   # Long enough
             ]
             
-            result = update_metadata_durations(metadata_file, audio_dir, verbose=False, min_duration=300)
+            result = extract_metadata_duration(metadata_file, audio_dir, verbose=False, min_duration=300)
             
             # Only long video should remain
             assert len(result['videos']) == 1
             assert result['videos'][0]['title'] == 'Long Video'
     
-    def test_update_metadata_durations_skips_existing(self, tmp_path):
+    def test_extract_metadata_duration_skips_existing(self, tmp_path):
         """Test that videos with existing duration are skipped"""
         metadata_file = tmp_path / "metadata.json"
         audio_dir = tmp_path / "audio"
@@ -417,10 +417,10 @@ class TestUpdateMetadataDurations:
         test_file2 = audio_dir / "2025-01-02_No_test2.mp3"
         test_file2.write_bytes(b"fake audio")
         
-        with patch('update_durations.get_audio_duration') as mock_get:
+        with patch('extract_duration.get_audio_duration') as mock_get:
             mock_get.return_value = (600.0, "10:00")
             
-            result = update_metadata_durations(metadata_file, audio_dir, verbose=False, min_duration=0)
+            result = extract_metadata_duration(metadata_file, audio_dir, verbose=False, min_duration=0)
             
             # Both should remain
             assert len(result['videos']) == 2

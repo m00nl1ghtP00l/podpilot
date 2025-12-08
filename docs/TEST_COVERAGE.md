@@ -115,7 +115,7 @@ Current overall coverage: **64%**
 - Test timeout handling
 ```
 
-### 5. `update_durations.py` (54% coverage)
+### 5. `extract_duration.py` (54% coverage)
 
 **Missing Coverage:**
 - Lines 17-26: Import error handling
@@ -126,10 +126,10 @@ Current overall coverage: **64%**
 
 **Recommended Tests:**
 ```python
-# tests/test_update_durations_extended.py
+# tests/test_extract_duration_extended.py
 - Test update_video_duration() with various inputs
 - Test update_video_duration_from_file() error cases
-- Test update_metadata_durations() with missing files
+- Test extract_metadata_duration() with missing files
 - Test CLI interface
 - Test filtering logic for short videos
 ```

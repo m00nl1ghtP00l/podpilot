@@ -236,13 +236,9 @@ python generate_lesson.py --name hnh --skip-existing
   - If `prompt_variant` is set (e.g., `myprompt`), the code looks for `system_prompt_{variant}.md` and `user_prompt_{variant}.md` in the language folder.
   - If neither is set, it falls back to `*_default.md`.
 
-### Update Duration Metadata
+### Extract Duration Metadata
 
-```bash
-python update_durations.py <json_file> [--audio-dir AUDIO_DIR]
-```
-
-This updates the metadata JSON file with duration information extracted from audio files.
+`extract_duration.py` is used by `download_audio.py` to extract duration metadata during the download process.
 
 ## Project Structure
 
@@ -253,7 +249,7 @@ podpilot/
 ├── transcribe.py                 # Transcribe using OpenAI Whisper API
 ├── local_whisper_transcribe.py   # Transcribe using local whisper.cpp
 ├── mp3_transcoder.py             # Transcode audio files to target size
-├── update_durations.py           # Update metadata with duration info
+├── extract_duration.py           # Extract duration metadata from audio files
 ├── generate_lesson.py            # Generate JLPT lessons from transcriptions
 ├── llm_providers.py              # LLM provider implementations (Ollama, OpenAI, Anthropic)
 ├── llm_config.py                 # LLM configuration defaults
@@ -282,7 +278,7 @@ podpilot/
 │   ├── test_local_whisper_transcribe.py
 │   ├── test_mp3_transcoder.py
 │   ├── test_podcast_downloader.py
-│   └── test_update_durations.py
+│   └── test_update_durations.py  # Tests for extract_duration.py
 ├── requirements.txt              # Python dependencies
 ├── pyproject.toml                # Modern Python packaging config
 └── downloads/                    # Downloaded audio files (gitignored)

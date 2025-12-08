@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Update metadata JSON with duration information from downloaded audio files
+Extract duration metadata from downloaded audio files
 """
 
 import argparse
@@ -152,9 +152,9 @@ def find_audio_file(audio_dir: Path, video_id: str, clean_filename: str) -> Opti
     return None
 
 
-def update_metadata_durations(metadata_file: Path, audio_dir: Path, verbose: bool = False, 
+def extract_metadata_duration(metadata_file: Path, audio_dir: Path, verbose: bool = False, 
                               min_duration: int = 300, delete_audio: bool = False) -> dict:
-    """Update metadata JSON with durations from audio files."""
+    """Extract duration metadata from audio files and update metadata JSON."""
     # Load metadata
     with open(metadata_file, 'r', encoding='utf-8') as f:
         metadata = json.load(f)
@@ -261,7 +261,7 @@ def update_metadata_durations(metadata_file: Path, audio_dir: Path, verbose: boo
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Update metadata JSON with duration from downloaded audio files',
+        description='Extract duration metadata from downloaded audio files',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -339,11 +339,11 @@ def main():
     elif args.min_duration is None:
         args.min_duration = 300  # Default if no config
     
-    # Update durations
-    print(f"\nUpdating durations from audio files...")
+    # Extract durations
+    print(f"\nExtracting durations from audio files...")
     if args.min_duration and args.min_duration > 0:
         print(f"Minimum duration: {format_duration(args.min_duration)} (videos shorter will be removed)")
-    updated_metadata = update_metadata_durations(
+    updated_metadata = extract_metadata_duration(
         metadata_file, audio_dir, args.verbose, args.min_duration, args.delete_audio
     )
     

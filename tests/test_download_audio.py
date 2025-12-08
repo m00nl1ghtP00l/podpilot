@@ -39,7 +39,7 @@ from download_audio import (
     main
 )
 from channel_fetcher import load_config, find_podcast_by_name
-from update_durations import format_duration, update_video_duration
+from extract_duration import format_duration, update_video_duration
 
 
 class TestLoadJson:
@@ -858,7 +858,7 @@ class TestDurationFunctions:
     """Tests for duration-related functions"""
     
     def test_format_duration_imported(self):
-        """Test that format_duration is imported from update_durations"""
+        """Test that format_duration is imported from extract_duration"""
         assert format_duration is not None
         assert callable(format_duration)
     
@@ -921,7 +921,7 @@ class TestDownloadModeWithDuration:
     """Tests for download_mode with duration handling"""
     
     @patch('download_audio.download_file')
-    @patch('update_durations.update_video_duration_from_file')
+    @patch('extract_duration.update_video_duration_from_file')
     @patch('download_audio.get_youtube_duration')
     def test_download_mode_saves_youtube_duration(self, mock_get_duration, mock_update_from_file, mock_download, tmp_path):
         """Test that YouTube duration is saved during download"""
@@ -964,7 +964,7 @@ class TestDownloadModeWithDuration:
         assert metadata['videos'][0]['duration'] == "08:20"
     
     @patch('download_audio.download_file')
-    @patch('update_durations.update_video_duration_from_file')
+    @patch('extract_duration.update_video_duration_from_file')
     @patch('download_audio.get_youtube_duration')
     def test_download_mode_processes_non_youtube_duration(self, mock_get_duration, mock_update_from_file, mock_download, tmp_path):
         """Test that non-YouTube files get duration from audio file"""

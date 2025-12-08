@@ -57,7 +57,7 @@ Tests are organized by the function/class they test. Test files include:
 - `test_local_whisper_transcribe.py` - Tests for local Whisper transcription
 - `test_mp3_transcoder.py` - Tests for audio transcoding
 - `test_podcast_downloader.py` - Tests for RSS podcast downloader
-- `test_update_durations.py` - Tests for duration metadata updates
+- `test_update_durations.py` - Tests for extract_duration.py (duration metadata extraction)
 - `test_generate_lesson.py` - Tests for lesson generation
 - `test_process_lessons.py` - Tests for batch lesson processing (now part of generate_lesson.py)
 - `test_llm_providers.py` - Tests for LLM provider implementations

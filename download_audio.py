@@ -16,8 +16,8 @@ import yt_dlp  # Added yt-dlp for reliable audio extraction
 # Import functions from channel_fetcher.py
 from channel_fetcher import clean_title, load_config, find_podcast_by_name, sanitize_filename
 
-# Import duration utilities from update_durations.py
-from update_durations import format_duration, update_video_duration, update_metadata_durations
+# Import duration utilities from extract_duration.py
+from extract_duration import format_duration, update_video_duration, extract_metadata_duration
 
 def load_json(json_file):
     """Load and validate JSON data"""
@@ -582,7 +582,7 @@ def download_mode(json_data, output_dir, args, json_file=None):
                 # For non-YouTube files or YouTube files where duration check failed,
                 # get duration from the downloaded audio file
                 if os.path.exists(output_path):
-                    from update_durations import update_video_duration_from_file
+                    from extract_duration import update_video_duration_from_file
                     updated, should_keep = update_video_duration_from_file(video, audio_dir_path, min_dur)
                     if updated:
                         duration_updates += 1
@@ -600,7 +600,7 @@ def download_mode(json_data, output_dir, args, json_file=None):
                 
                 # Get duration from the existing audio file
                 if os.path.exists(file_path):
-                    from update_durations import update_video_duration_from_file
+                    from extract_duration import update_video_duration_from_file
                     updated, should_keep = update_video_duration_from_file(video, audio_dir_path, min_dur)
                     if updated:
                         duration_updates += 1
