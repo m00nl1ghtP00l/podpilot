@@ -132,6 +132,12 @@ class JapaneseAdapter(LanguageAdapter):
         # Normalize full-width spaces to regular spaces before processing
         result = result.replace('\u3000', ' ')  # Full-width space (U+3000)
         
+        # Normalize spaces around # to ensure consistent filenames
+        # Remove spaces immediately before # (e.g., " #49" -> "#49")
+        result = re.sub(r'\s+#', '#', result)
+        # Remove spaces immediately after # if followed by digits (e.g., "# 49" -> "#49")
+        result = re.sub(r'#\s+(\d)', r'#\1', result)
+        
         # Extract Japanese segments again from emoji-removed and normalized result
         jp_segments_final = _extract_japanese_segments(result)
         

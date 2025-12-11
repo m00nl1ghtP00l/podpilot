@@ -9,4 +9,7 @@ pytest-mock>=3.11.0
 # Optional LLM provider dependencies (install as needed)
 # For OpenAI: pip install openai
 # For Anthropic: pip install anthropic
-# For Ollama: no additional package needed (uses requests) 
+# For Ollama: no additional package needed (uses requests)
+
+# Vector database for semantic search
+chromadb>=0.4.0 

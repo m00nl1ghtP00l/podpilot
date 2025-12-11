@@ -14,6 +14,13 @@
     "provider": "whisper.cpp",
     "model_path": "${WHISPER_MODEL_PATH}"
   },
+  "embeddings": {
+    "model": "mxbai-embed-large",
+    "base_url": "http://localhost:11434",
+    "similarity_threshold": 0.5,
+    "top_k": 5,
+    "enabled": true
+  },
   "min_duration": 300,
   "youtube_channels": [
     {

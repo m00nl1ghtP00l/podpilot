@@ -12,6 +12,14 @@ from datetime import timezone
 import shutil
 from channel_fetcher import load_config, find_podcast_by_name, sanitize_filename
 
+# Optional imports for semantic search chunking
+try:
+    from chroma_search import get_chroma_collection, check_chunks_exist, store_transcription_chunks
+    from transcription_chunks import chunk_transcription_file
+    CHUNKING_AVAILABLE = True
+except ImportError:
+    CHUNKING_AVAILABLE = False
+
 # Import language adapter system
 try:
     from adapters import get_language_adapter
@@ -35,6 +43,65 @@ def parse_date_arg(date_str):
             raise argparse.ArgumentTypeError(
                 'Invalid date format. Use YYYY-MM-DD or ISO format'
             )
+
+def chunk_and_store_transcription(transcript_path: Path, data_root: Path):
+    """
+    Chunk transcription and store in Chroma for semantic search.
+    Non-blocking - failures don't affect transcription success.
+    
+    Args:
+        transcript_path: Path to the _transcript.txt file
+        data_root: Root data directory (e.g., podpilot-data)
+    """
+    if not CHUNKING_AVAILABLE:
+        return
+    
+    try:
+        # Try to find config file (could be in project root or data_root parent)
+        # Common locations: project_root/config/podcasts.json
+        config_file = Path("config/podcasts.json")
+        if not config_file.exists():
+            # Try relative to data_root (if data_root is podpilot-data, config might be in podpilot/config)
+            config_file = data_root.parent / "config" / "podcasts.json"
+        if not config_file.exists():
+            # Try absolute path from project root (if script is run from project root)
+            import os
+            script_dir = Path(__file__).parent
+            config_file = script_dir / "config" / "podcasts.json"
+        if not config_file.exists():
+            return
+        
+        config = load_config(str(config_file))
+        embeddings_cfg = config.get('embeddings', {})
+        
+        # Skip if embeddings disabled
+        if embeddings_cfg.get('enabled', True) is False:
+            return
+        
+        # Get Chroma collection
+        collection = get_chroma_collection(data_root, config)
+        if not collection:
+            return
+        
+        # Chunk the transcription
+        chunks = chunk_transcription_file(transcript_path, data_root)
+        if not chunks:
+            return
+        
+        # Check which chunks already exist
+        chunk_ids = [c['chunk_id'] for c in chunks]
+        existing_ids = check_chunks_exist(collection, chunk_ids)
+        
+        # Filter out existing chunks
+        new_chunks = [c for c in chunks if c['chunk_id'] not in existing_ids]
+        
+        if new_chunks:
+            stored_count = store_transcription_chunks(new_chunks, collection, force=False)
+            print(f"✓ Indexed {stored_count} chunk(s) for semantic search")
+    
+    except Exception as e:
+        # Silently fail - don't interrupt transcription
+        pass
 
 def get_file_date(filename):
     """Extract date from filename in YYYY-MM-DD format"""
@@ -63,9 +130,15 @@ def is_date_in_range(date, from_date, to_date):
 def check_existing_transcription(file_path):
     """Check if transcription files already exist for this audio file"""
     base_path = Path(file_path).with_suffix('')
+    base_filename = base_path.name
+    
+    # Check for various transcription file formats
     json_exists = base_path.with_suffix('.json').exists()
     txt_exists = base_path.with_suffix('.txt').exists()
-    return json_exists or txt_exists
+    transcript_exists = (base_path.parent / f"{base_filename}_transcript.txt").exists()
+    srt_exists = base_path.with_suffix('.srt').exists()
+    
+    return json_exists or txt_exists or transcript_exists or srt_exists
 
 def find_whisper_executable():
     """Find the whisper-cli executable in PATH"""
@@ -186,7 +259,18 @@ def transcribe_audio(file_path, model_config, language="ja", test_duration=None,
         print(f"Formatted transcript saved to {text_path}")
         # Write clean transcript
         write_clean_transcript(text_path)
-        print(f"Clean transcript saved to {text_path.with_name(text_path.stem + '_transcript.txt')}")
+        clean_transcript_path = text_path.with_name(text_path.stem + '_transcript.txt')
+        print(f"Clean transcript saved to {clean_transcript_path}")
+        
+        # Optionally chunk and store in Chroma (non-blocking)
+        try:
+            # data_root is the parent of the channel directory (e.g., podpilot-data/hnh -> podpilot-data)
+            data_root = input_file_path.parent.parent
+            chunk_and_store_transcription(clean_transcript_path, data_root)
+        except Exception as e:
+            # Don't fail transcription if chunking fails
+            print(f"Note: Could not chunk transcription for semantic search: {e}")
+        
         return True
 
     except Exception as e:

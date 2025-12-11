@@ -24,6 +24,7 @@ Podpilot automates the process of:
 - ⏱️ **Duration Management** - Automatic duration extraction and metadata updates
 - ⚙️ **Flexible Configuration** - Centralized config with environment variable support
 - 🧭 **Editable Prompts** - Markdown system/user prompts with variants (default/detailed) and config-based file paths
+- 🔍 **Semantic Search** - Vector-based semantic search using Chroma for intelligent question answering (with automatic fallback to keyword search)
 
 ## Tracked Podcasts
 
@@ -40,6 +41,8 @@ Currently tracking 4 Japanese language learning channels:
 ```bash
 pip install -r requirements.txt
 ```
+
+**Note:** This includes `chromadb` for semantic search. If Chroma is unavailable or disabled in config, the system automatically falls back to keyword-based search.
 
 ### 2. Configure Podcasts
 
@@ -215,6 +218,73 @@ python generate_lesson.py --name hnh --simulate
 python generate_lesson.py --name hnh --skip-existing
 ```
 
+### Create Learning Packs with AI Agent
+
+The learning agent orchestrates the entire podpilot pipeline to create personalized learning packs. It uses LLM to understand your goals and automatically executes the necessary tools:
+
+```bash
+python learning_agent.py "I want to learn business Japanese from recent episodes" --name hnh
+```
+
+**How it works:**
+1. **Plans execution**: Uses LLM to determine which tools to run (find episodes, download, transcribe, generate lessons)
+2. **Executes tools**: Automatically calls your Python tools programmatically:
+   - `channel_fetcher.py` functions to find episodes
+   - `download_audio.py` functions to download audio
+   - `local_whisper_transcribe.py` functions to transcribe
+   - `generate_lesson.py` functions to generate lessons
+3. **Creates learning pack**: Generates a comprehensive pack with:
+   - Learning objectives
+   - Curated vocabulary and grammar
+   - Practice exercises
+   - Review sections
+   - Next steps
+
+**Examples:**
+```bash
+# Full pipeline - finds, downloads, transcribes, generates lessons, creates pack
+python learning_agent.py "I want to learn business Japanese vocabulary from recent episodes" --name hnh
+
+# Use existing lessons only (skip tool execution)
+python learning_agent.py "I want to practice N3 grammar patterns" --skip-tools
+
+# Filter by date range
+python learning_agent.py "Recent lessons about travel" --from-date 2024-01-01 --name sjn
+
+# Force re-download/re-transcribe/re-generate
+python learning_agent.py "Business Japanese basics" --force
+
+# Specify output file
+python learning_agent.py "Grammar review" --output my_grammar_pack.md
+```
+
+The learning pack is saved as a Markdown file that you can study from or print.
+
+### Conversational Agent (Interactive Chat)
+
+For an interactive chat experience with conversation history and follow-up questions:
+
+```bash
+python conversational_agent.py
+```
+
+**Features:**
+- Maintains conversation history
+- Handles follow-up questions
+- Asks for clarifications when needed
+- Natural language interaction
+- **Semantic search**: Uses Chroma vector database for intelligent question answering (automatically falls back to keyword search if Chroma unavailable)
+
+**Example:**
+```
+You: I want to learn business Japanese vocabulary
+Assistant: I can help! Do you have specific channels in mind?
+You: Use hnh channel
+Assistant: Found 5 episodes. Creating learning pack...
+```
+
+See `docs/CONVERSATIONAL_AGENT.md` for more details.
+
 ### Prompts (System vs User)
 
 - **System prompt**: sets the model’s role, tone, and required output format. Lives in `adapters/prompts/{lang}/system_prompt_default.md` (or variant files). Loaded once per request.
@@ -251,6 +321,8 @@ podpilot/
 ├── mp3_transcoder.py             # Transcode audio files to target size
 ├── extract_duration.py           # Extract duration metadata from audio files
 ├── generate_lesson.py            # Generate JLPT lessons from transcriptions
+├── lesson_search.py              # Search and parse lesson files
+├── learning_agent.py             # AI agent for creating personalized learning packs
 ├── llm_providers.py              # LLM provider implementations (Ollama, OpenAI, Anthropic)
 ├── llm_config.py                 # LLM configuration defaults
 ├── adapters/                     # Language adapters and prompts
@@ -305,6 +377,7 @@ See `TESTING.md` and `tests/README.md` for more information.
 - Python 3.10+
 - ffmpeg (for audio transcoding)
 - yt-dlp (for YouTube downloads)
+- chromadb (installed via `pip install -r requirements.txt` - for semantic search, automatically falls back to keyword search if unavailable)
 - OpenAI API key (optional, for cloud transcription or lesson generation)
 - whisper.cpp (optional, for local transcription) - see [installation instructions](https://github.com/ggerganov/whisper.cpp#usage)
 - Ollama (optional, for local LLM tasks like summarisation, analysis, or turning the text into a personalised learning experience)
