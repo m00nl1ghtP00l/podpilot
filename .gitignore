@@ -27,13 +27,12 @@ wheels/
 MANIFEST
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
-youtube_env/
-openai_env/
 
 # IDE
 .vscode/

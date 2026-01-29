@@ -71,10 +71,9 @@ source = ["."]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
+    "*/.venv/*",
     "*/venv/*",
     "*/env/*",
-    "*/youtube_env/*",
-    "*/openai_env/*",
     "setup.py",
 ]
 
