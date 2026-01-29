@@ -12,15 +12,21 @@ Generate markdown learning materials from Japanese podcast episodes using native
 
 - **Data directory:** `$PODPILOT_DATA` (set this env variable to your data directory)
 - **Whisper model:** `$WHISPER_MODEL_PATH` (ggml-base.bin)
-- **Channels:** hnh, sjn, ss, yuyu
+- **Channels:** Configure in `config/podcasts.json`
 
-### Channel IDs
-| Short | Channel ID |
-|-------|------------|
-| hnh | UCauyM-A8JIJ9NQcw5_jF00Q |
-| sjn | UC_NROu3WWx1KZ7tNl275F7A |
-| ss | UCqMY-cp1He6IAi1cIz-gX1g |
-| yuyu | UC8dWfySP_cKDMFj6aFfQbFA |
+### Getting Channel IDs
+
+Find YouTube channel IDs from RSS feeds or channel pages. Add them to `config/podcasts.json`:
+
+```json
+"youtube_channels": [
+  {
+    "channel_name_short": "example",
+    "channel_name_long": "Example Podcast",
+    "channel_id": "UCxxxxxxxxxxxxxxxxxx"
+  }
+]
+```
 
 ## Workflow
 
