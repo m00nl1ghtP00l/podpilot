@@ -35,13 +35,20 @@ Currently tracking 4 Japanese language learning channels:
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Create Virtual Environment (Recommended)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Podcasts
+### 3. Configure Podcasts
 
 Copy the example configuration and edit it:
 
@@ -53,11 +60,13 @@ Then edit `config/podcasts.json` to add or modify the channels you want to track
 
 ```json
 {
+  "language": "ja",
   "youtube_url": "https://www.youtube.com/feeds/videos.xml",
   "data_root": "/path/to/your/data/directory",
   "analysis": {
     "provider": "ollama",
-    "model": "qwen2.5:14b"
+    "model": "qwen2.5:14b",
+    "base_url": "${OLLAMA_BASE_URL}"
   },
   "transcription": {
     "provider": "whisper.cpp",
@@ -67,7 +76,7 @@ Then edit `config/podcasts.json` to add or modify the channels you want to track
   "youtube_channels": [
     {
       "channel_name_short": "sjn",
-      "channel_name_long":"Speak Japanese Naturally",
+      "channel_name_long": "Speak Japanese Naturally",
       "channel_id": "UC_NROu3WWx1KZ7tNl275F7A"
     }
   ]
@@ -107,7 +116,7 @@ The location depends on which script you use:
 
 **Recommendation:** Use a directory outside your project folder (e.g., `../podpilot-data` or `/Users/yourname/Documents/podpilot-data`) to keep data separate from code. This prevents accidentally committing large audio files to git and allows for different backup strategies for code vs. data.
 
-### 3. Set Up Transcription (Optional)
+### 4. Set Up Transcription (Optional)
 
 **For OpenAI Whisper API:**
 - Set your OpenAI API key: `export OPENAI_API_KEY=your_key_here`
@@ -250,7 +259,7 @@ podpilot/
 ├── local_whisper_transcribe.py   # Transcribe using local whisper.cpp
 ├── mp3_transcoder.py             # Transcode audio files to target size
 ├── extract_duration.py           # Extract duration metadata from audio files
-├── generate_lesson.py            # Generate JLPT lessons from transcriptions
+├── generate_lesson.py            # Generate lessons from transcriptions
 ├── llm_providers.py              # LLM provider implementations (Ollama, OpenAI, Anthropic)
 ├── llm_config.py                 # LLM configuration defaults
 ├── adapters/                     # Language adapters and prompts
@@ -262,13 +271,14 @@ podpilot/
 │           ├── system_prompt_default.md
 │           └── user_prompt_default.md
 │           # Custom prompts eg *<personal>.md are gitignored
-├── podcast_downloader.py        # Alternative downloader implementation
 ├── config/                       # Configuration files
 │   ├── podcasts.json.example     # Example configuration
 │   ├── podcasts.json             # Your configuration (gitignored)
 │   └── README.md                 # Configuration documentation
 ├── docs/                         # Documentation
-│   └── README.md                 # Testing guide
+│   ├── README.md                 # Testing guide
+│   ├── ADAPTERS.md               # Language adapter documentation
+│   └── TEST_COVERAGE.md          # Test coverage information
 ├── scripts/                      # Utility scripts
 │   └── run_tests.sh
 ├── tests/                        # Test suite
@@ -277,11 +287,12 @@ podpilot/
 │   ├── test_transcribe.py
 │   ├── test_local_whisper_transcribe.py
 │   ├── test_mp3_transcoder.py
-│   ├── test_podcast_downloader.py
+│   ├── test_generate_lesson.py
+│   ├── test_llm_providers.py
 │   └── test_update_durations.py  # Tests for extract_duration.py
 ├── requirements.txt              # Python dependencies
 ├── pyproject.toml                # Modern Python packaging config
-└── downloads/                    # Downloaded audio files (gitignored)
+└── .venv/                        # Virtual environment (gitignored)
 ```
 
 ## Testing
@@ -298,7 +309,7 @@ Or with coverage:
 pytest --cov=. --cov-report=html
 ```
 
-See `TESTING.md` and `tests/README.md` for more information.
+See `docs/README.md` for detailed testing information and `docs/TEST_COVERAGE.md` for coverage reports.
 
 ## Requirements
 
